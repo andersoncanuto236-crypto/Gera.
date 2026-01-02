@@ -20,12 +20,12 @@ const Sidebar: React.FC<SidebarProps> = ({ score, view, settings, onNavigate, on
           <div className="logo-shape-sm shadow-lg"><span className="text-white text-xl font-black">G</span></div>
           <span className="font-black text-3xl text-white tracking-tighter">Gera.</span>
         </div>
-        <button onClick={onOpenSettings} className={`text-slate-500 hover:text-white transition ${buttonHoverClasses}`}>
+        <button onClick={onOpenSettings} aria-label="Abrir Configurações" className={`text-slate-500 hover:text-white transition ${buttonHoverClasses}`}>
           <i className="fas fa-cog text-xl"></i>
         </button>
       </div>
 
-      <nav className="flex-1 p-6 space-y-3 overflow-y-auto custom-scrollbar">
+      <nav className="flex-1 p-6 space-y-3 overflow-y-auto custom-scrollbar" aria-label="Navegação Principal">
         <ScoreWidget score={score} />
 
         {[

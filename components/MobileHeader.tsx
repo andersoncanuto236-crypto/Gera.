@@ -19,7 +19,7 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({ score, onOpenSettings }) =>
           <div className="w-2 h-2 rounded-full bg-brand-500"></div>
           <span className="text-[10px] font-black text-white">{score}</span>
         </div>
-        <button onClick={onOpenSettings} className={`w-10 h-10 bg-white/5 rounded-full flex items-center justify-center border border-white/10 ${buttonHoverClasses}`}>
+        <button onClick={onOpenSettings} aria-label="Abrir Configurações" className={`w-10 h-10 bg-white/5 rounded-full flex items-center justify-center border border-white/10 ${buttonHoverClasses}`}>
           <i className="fas fa-cog"></i>
         </button>
       </div>

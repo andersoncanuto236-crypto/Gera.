@@ -1,20 +1,23 @@
 
-import React, { useState } from 'react';
+import React, { useState, Suspense, lazy } from 'react';
 import { ViewState } from './types';
-import Generator from './components/Generator';
-import CalendarGenerator from './components/CalendarGenerator';
-import Pricing from './components/Pricing';
 import SettingsModal from './components/SettingsModal';
 import Login from './components/Login';
 import AIAgent from './components/AIAgent';
-import History from './components/History';
-import Dashboard from './components/Dashboard';
-import Notes from './components/Notes';
-import Management from './components/Management';
 import Sidebar from './components/Sidebar';
 import MobileHeader from './components/MobileHeader';
+import ErrorBoundary from './components/ErrorBoundary';
 import { useSettings } from './hooks/useSettings';
 import { useScore } from './hooks/useScore';
+
+// Lazy load components
+const Generator = lazy(() => import('./components/Generator'));
+const CalendarGenerator = lazy(() => import('./components/CalendarGenerator'));
+const Pricing = lazy(() => import('./components/Pricing'));
+const History = lazy(() => import('./components/History'));
+const Dashboard = lazy(() => import('./components/Dashboard'));
+const Notes = lazy(() => import('./components/Notes'));
+const Management = lazy(() => import('./components/Management'));
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>('login');
@@ -93,6 +96,12 @@ const App: React.FC = () => {
     }
   };
 
+  const LoadingFallback = () => (
+    <div className="flex items-center justify-center min-h-[400px]">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-brand-500"></div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen flex text-slate-200 font-sans selection:bg-brand-500/30 selection:text-white">
       <Sidebar
@@ -107,7 +116,11 @@ const App: React.FC = () => {
         <MobileHeader score={score} onOpenSettings={() => setIsSettingsOpen(true)} />
 
         <div className="p-6 md:p-12 max-w-7xl mx-auto w-full flex-1 z-10">
-          {renderContent()}
+          <ErrorBoundary>
+            <Suspense fallback={<LoadingFallback />}>
+              {renderContent()}
+            </Suspense>
+          </ErrorBoundary>
         </div>
 
         {isProfileConfigured && <AIAgent settings={settings} />}
