@@ -21,33 +21,41 @@ export interface GeneratedContent {
   hashtags: string[];
   imageSuggestion: string;
   bestTime: string;
-  script?: string;
-  type: 'POST' | 'REELS';
-}
-
-export interface HistoryItem {
-  id: string;
-  timestamp: number;
-  topic: string;
-  content: GeneratedContent;
+  type: 'POST' | 'REELS' | 'STORY';
+  
+  // Campos opcionais do Multiplicador
+  multiplied?: {
+    reelsScript?: string;
+    storySequence?: string[]; // Array de textos para sequencia
+    linkedinText?: string;
+  };
 }
 
 export interface CalendarDay {
   id: string;
-  day: string;
+  date: string; // ISO string
+  day: string;  // Friendly label (e.g., "Hoje", "Segunda")
   topic: string;
   type: 'POST' | 'REELS' | 'STORY';
   brief: string;
-  bestTime?: string;
-  holidayInfo?: string;
+  status: 'pending' | 'done';
+  resultNotes?: string;
   contentBody?: string;
+  bestTime?: string;
+}
+
+export interface HistoryItem {
+  id: string;
+  topic: string;
+  content: GeneratedContent;
+  timestamp: number;
 }
 
 export interface DashboardMetric {
-  date: string;
   likes: number;
   views: number;
   conversions: number;
+  timestamp: number;
 }
 
 export interface Goal {
@@ -60,9 +68,8 @@ export interface Goal {
 
 export interface Note {
   id: string;
-  title: string;
-  content: string;
+  text: string;
   timestamp: number;
 }
 
-export type ViewState = 'login' | 'home' | 'generator' | 'calendar' | 'pricing' | 'history' | 'dashboard' | 'notes' | 'deep-analysis' | 'management';
+export type ViewState = 'login' | 'today' | 'calendar' | 'create' | 'register' | 'decision';

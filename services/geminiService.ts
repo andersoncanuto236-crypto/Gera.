@@ -1,89 +1,70 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { UserSettings, GeneratedContent, CalendarDay, Goal, DashboardMetric, Note, HistoryItem } from "../types";
+import { UserSettings, GeneratedContent, CalendarDay, DashboardMetric, Goal, HistoryItem, Note } from "../types";
+import { sanitize, getSafeApiKey } from "./security";
 
 const getAiClient = () => {
-  return new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = getSafeApiKey();
+  return new GoogleGenAI({ apiKey });
 };
 
-const MANAGEMENT_PERSONA = `
-Você é o Módulo de Ponto de Gestão do app Gera. Seu papel é atuar como um gestor estratégico de Social Media Sênior.
-Você NÃO cria legendas nem copies. Você analisa, mede, orienta e corrige a estratégia com base em dados e objetivos.
-
-REGRAS ESTRITAS DE FORMATAÇÃO:
-1. PROIBIDO USAR MARKDOWN. Não use negrito (**), itálico (*), headers (###) ou bullet points (-).
-2. Escreva em texto corrido, separado apenas por parágrafos duplos.
-3. Use pontuação correta e formal.
-4. Seja direto, cirúrgico e profissional. Sem "olá", "parabéns" ou enrolação. Vá direto ao ponto.
+const SYSTEM_CORE = `
+Você é o motor do Gera. Um sistema de decisão pragmático.
+Não dê aulas. Não use Markdown (** ou ###).
+Seja direto. Use parágrafos simples.
+SEGURANÇA: Nunca inclua tags <script> ou HTML nas respostas.
+Foco: Decidir o que postar, criar o conteúdo ou avaliar resultados.
 `;
 
-export const getManagementDiagnosis = async (
-  settings: UserSettings, 
-  metrics: DashboardMetric[], 
-  goals: Goal[],
-  history: HistoryItem[],
-  notes: Note[]
-): Promise<string> => {
+export const analyzeBusinessProfile = async (
+  name: string,
+  city: string,
+  description: string
+): Promise<{ niche: string; audience: string; tone: string }> => {
   const ai = getAiClient();
-  const labels = settings.metricLabels || { likes: 'Curtidas', views: 'Views', conversions: 'Conversões' };
+  const prompt = `Analise este negócio: ${name} em ${city}. Descrição: ${description}. Defina Nicho, Público-Alvo e Tom de Voz ideais para redes sociais.`;
   
-  const prompt = `
-    ${MANAGEMENT_PERSONA}
-    
-    ANALISE ESTE PERFIL DE NEGÓCIO COMPLETAMENTE:
-    Nome: ${settings.businessName}
-    Nicho de Mercado: ${settings.niche}
-    Público Alvo: ${settings.audience}
-    Tom de Voz Definido: ${settings.tone}
-    Cargo do Usuário: ${settings.jobTitle}
-    
-    DADOS DE GESTÃO:
-    - Metas Ativas e Progresso: ${JSON.stringify(goals)}
-    - Tópicos Recentes Criados: ${JSON.stringify(history.map(h => h.topic).slice(0, 10))}
-    - Volume de Ideias Paradas (Backlog): ${notes.length}
-    - O que o usuário valoriza (Labels): ${JSON.stringify(labels)}
-
-    TAREFA: 
-    Escreva um diagnóstico estratégico de 3 parágrafos.
-    Parágrafo 1: Diagnóstico de Identidade. O conteúdo criado (histórico) faz sentido para o público alvo e nicho descritos?
-    Parágrafo 2: Análise de Performance/Metas. Estamos longe ou perto das metas? O que os números dizem sobre a tração atual?
-    Parágrafo 3: Ordem de Correção. Dê uma instrução clara do que deve mudar na próxima semana para atingir o público certo.
-    
-    LEMBRE-SE: TEXTO LIMPO. SEM SÍMBOLOS ESPECIAIS.
-  `;
-  const response = await ai.models.generateContent({ model: "gemini-3-pro-preview", contents: prompt });
-  return response.text || "Dados insuficientes para uma análise estratégica profunda.";
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          niche: { type: Type.STRING },
+          audience: { type: Type.STRING },
+          tone: { type: Type.STRING }
+        },
+        required: ["niche", "audience", "tone"]
+      }
+    }
+  });
+  const data = JSON.parse(response.text || '{}');
+  return {
+    niche: sanitize(data.niche),
+    audience: sanitize(data.audience),
+    tone: sanitize(data.tone)
+  };
 };
 
-export const strategicResearch = async (settings: UserSettings, query: string): Promise<string> => {
-  const ai = getAiClient();
-  const prompt = `
-    ${MANAGEMENT_PERSONA}
-    Pesquisa Estratégica sobre: "${query}".
-    Analise o contexto de ${settings.niche} em ${settings.city}.
-    Retorne um texto limpo, profissional e sem jargões de IA. Sem markdown.
-  `;
-  const response = await ai.models.generateContent({ model: "gemini-3-flash-preview", contents: prompt });
-  return response.text || "Sem insights para esta pesquisa.";
-};
-
-export const generateSocialContent = async (
+export const generatePost = async (
   settings: UserSettings,
   topic: string,
-  contentType: 'POST' | 'REELS',
-  goal: string,
-  additionalInfo?: string
+  type: 'POST' | 'REELS' | 'STORY',
+  goal: string
 ): Promise<GeneratedContent> => {
   const ai = getAiClient();
   const prompt = `
-    Estrategista Sênior. Gere post humano. 
-    CLIENTE: ${settings.businessName} (${settings.niche}). 
-    TEMA: ${topic}. FORMATO: ${contentType}. OBJETIVO: ${goal}.
-    Linguagem 100% humana. Sem clichês de IA.
+    ${SYSTEM_CORE}
+    CLIENTE: ${settings.businessName} (${settings.niche}).
+    PÚBLICO: ${settings.audience}.
+    TEMA: ${topic}. FORMATO: ${type}. OBJETIVO: ${goal}.
+    Gere um post pronto para uso. Linguagem humana real.
   `;
 
   const response = await ai.models.generateContent({
-    model: "gemini-3-pro-preview",
+    model: "gemini-3-flash-preview",
     contents: prompt,
     config: {
       responseMimeType: "application/json",
@@ -102,12 +83,224 @@ export const generateSocialContent = async (
     }
   });
 
-  return { ...JSON.parse(response.text || '{}'), type: contentType } as GeneratedContent;
+  const raw = JSON.parse(response.text || '{}');
+  return {
+    hook: sanitize(raw.hook),
+    caption: sanitize(raw.caption),
+    cta: sanitize(raw.cta),
+    hashtags: (raw.hashtags || []).map((h: string) => sanitize(h)),
+    imageSuggestion: sanitize(raw.imageSuggestion),
+    bestTime: sanitize(raw.bestTime),
+    type: type
+  };
 };
 
-export const suggestDashboardGoals = async (settings: UserSettings): Promise<Partial<Goal>[]> => {
+// --- NOVA FUNÇÃO: MULTIPLICADOR DE CONTEÚDO ---
+export const multiplyContent = async (
+  settings: UserSettings,
+  originalContent: GeneratedContent
+): Promise<{ reelsScript: string; storySequence: string[]; linkedinText: string }> => {
   const ai = getAiClient();
-  const prompt = `Sugira 3 metas reais para ${settings.niche}. JSON: [{label, target, type: 'likes'|'views'|'conversions'}]`;
+  const prompt = `
+    ${SYSTEM_CORE}
+    Aja como um editor chefe de social media.
+    Baseado neste post original: "${originalContent.caption}"
+    Do cliente: ${settings.businessName} (${settings.tone}).
+    
+    Crie 3 adaptações EXATAS:
+    1. Um roteiro de Reels de 30s (falado, direto).
+    2. Uma sequência de 3 Stories interativos (com enquete).
+    3. Um texto curto e provocativo para LinkedIn/Threads.
+  `;
+
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          reelsScript: { type: Type.STRING, description: "Roteiro completo narrado" },
+          storySequence: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Texto para 3 stories" },
+          linkedinText: { type: Type.STRING, description: "Texto corporativo/curto" }
+        },
+        required: ["reelsScript", "storySequence", "linkedinText"]
+      }
+    }
+  });
+
+  const raw = JSON.parse(response.text || '{}');
+  return {
+    reelsScript: sanitize(raw.reelsScript),
+    storySequence: (raw.storySequence || []).map((s: string) => sanitize(s)),
+    linkedinText: sanitize(raw.linkedinText)
+  };
+};
+
+// --- NOVA FUNÇÃO: ROBIN HOOD (REMIX) ---
+export const remixContent = async (
+  settings: UserSettings,
+  sourceText: string,
+  type: 'POST' | 'REELS' | 'STORY'
+): Promise<GeneratedContent> => {
+  const ai = getAiClient();
+  const prompt = `
+    ${SYSTEM_CORE}
+    TAREFA: Remix Robin Hood.
+    Pegue este texto de referência (concorrente/inspiração): "${sourceText}"
+    
+    Reescreva-o TOTALMENTE para o negócio: ${settings.businessName}.
+    Nicho: ${settings.niche}. Tom: ${settings.tone}.
+    
+    Regras:
+    1. Mantenha a estrutura viral/lógica da referência.
+    2. Troque todos os exemplos e jargões para o nicho do usuário.
+    3. GARANTA que seja original (sem plágio).
+    4. Formato de saída: ${type}.
+  `;
+
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          hook: { type: Type.STRING },
+          caption: { type: Type.STRING },
+          cta: { type: Type.STRING },
+          hashtags: { type: Type.ARRAY, items: { type: Type.STRING } },
+          imageSuggestion: { type: Type.STRING },
+          bestTime: { type: Type.STRING }
+        },
+        required: ["hook", "caption", "cta", "hashtags", "imageSuggestion", "bestTime"]
+      }
+    }
+  });
+
+  const raw = JSON.parse(response.text || '{}');
+  return {
+    hook: sanitize(raw.hook),
+    caption: sanitize(raw.caption),
+    cta: sanitize(raw.cta),
+    hashtags: (raw.hashtags || []).map((h: string) => sanitize(h)),
+    imageSuggestion: sanitize(raw.imageSuggestion),
+    bestTime: sanitize(raw.bestTime),
+    type: type
+  };
+};
+
+export const generateCalendar = async (
+  settings: UserSettings,
+  plan: string,
+  duration: 'WEEK' | 'MONTH'
+): Promise<CalendarDay[]> => {
+  const ai = getAiClient();
+  const prompt = `
+    ${SYSTEM_CORE}
+    Gere um plano de conteúdo para ${settings.businessName} (${settings.niche}).
+    Duração: ${duration}. Plano: ${plan}.
+    Gere sugestões de posts com data (ISO YYYY-MM-DD), dia da semana, tema, formato (POST, REELS, STORY) e briefing.
+  `;
+
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            id: { type: Type.STRING },
+            date: { type: Type.STRING },
+            day: { type: Type.STRING },
+            topic: { type: Type.STRING },
+            type: { type: Type.STRING, enum: ["POST", "REELS", "STORY"] },
+            brief: { type: Type.STRING },
+            status: { type: Type.STRING, enum: ["pending", "done"] }
+          },
+          required: ["id", "date", "day", "topic", "type", "brief", "status"]
+        }
+      }
+    }
+  });
+
+  const rawArray = JSON.parse(response.text || '[]');
+  return rawArray.map((d: any) => ({
+    ...d,
+    topic: sanitize(d.topic),
+    brief: sanitize(d.brief),
+    day: sanitize(d.day)
+  }));
+};
+
+export const getDecisionMatrix = async (
+  settings: UserSettings,
+  records: CalendarDay[]
+): Promise<string> => {
+  const ai = getAiClient();
+  const prompt = `
+    ${SYSTEM_CORE}
+    Analise os posts realizados de ${settings.businessName}:
+    ${JSON.stringify(records.filter(r => r.status === 'done'))}
+    
+    Ação: Para cada tipo de post ou tema, decida: REPETIR, AJUSTAR ou PARAR.
+    Seja curto. Um parágrafo por decisão.
+  `;
+  const response = await ai.models.generateContent({ model: "gemini-3-pro-preview", contents: prompt });
+  return sanitize(response.text || "Sem dados suficientes para decidir.");
+};
+
+export const suggestTodayAction = async (settings: UserSettings): Promise<string> => {
+  const ai = getAiClient();
+  const prompt = `
+    ${SYSTEM_CORE}
+    Nicho: ${settings.niche}. O que postar HOJE para gerar venda ou autoridade?
+    Dê uma única sugestão direta.
+  `;
+  const response = await ai.models.generateContent({ model: "gemini-3-flash-preview", contents: prompt });
+  return sanitize(response.text || "Poste um bastidor do seu trabalho hoje.");
+};
+
+export const repurposeContent = async (
+  content: string, 
+  format: string, 
+  settings: UserSettings
+): Promise<string> => {
+  const ai = getAiClient();
+  const prompt = `Transforme este conteúdo em um novo formato: ${format}. Conteúdo original: "${content}". 
+    Mantenha o tom de voz da marca ${settings.businessName}.`;
+  
+  const response = await ai.models.generateContent({ 
+    model: "gemini-3-flash-preview", 
+    contents: prompt 
+  });
+  return sanitize(response.text || "");
+};
+
+export const getDashboardFeedback = async (
+  settings: UserSettings, 
+  metrics: DashboardMetric[]
+): Promise<string> => {
+  const ai = getAiClient();
+  const prompt = `Como estrategista de growth, analise os números de ${settings.businessName}: ${JSON.stringify(metrics)}. 
+    Forneça um feedback prático e direto sobre a performance.`;
+  
+  const response = await ai.models.generateContent({ 
+    model: "gemini-3-pro-preview", 
+    contents: prompt 
+  });
+  return sanitize(response.text || "");
+};
+
+export const suggestDashboardGoals = async (settings: UserSettings): Promise<any[]> => {
+  const ai = getAiClient();
+  const prompt = `Sugira 3 metas estratégicas (KPIs) para ${settings.businessName} (${settings.niche}).`;
+  
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
     contents: prompt,
@@ -120,137 +313,60 @@ export const suggestDashboardGoals = async (settings: UserSettings): Promise<Par
           properties: {
             label: { type: Type.STRING },
             target: { type: Type.NUMBER },
-            type: { type: Type.STRING, enum: ["likes", "views", "conversions"] }
+            type: { type: Type.STRING, enum: ['likes', 'views', 'conversions'] }
           },
           required: ["label", "target", "type"]
         }
       }
     }
   });
-  return JSON.parse(response.text || '[]');
-};
-
-export const refineIntent = async (intent: string): Promise<any> => {
-  const ai = getAiClient();
-  const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: `Refine: "${intent}".`,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          suggestedTheme: { type: Type.STRING },
-          suggestedFormat: { type: Type.STRING, enum: ["POST", "REELS"] },
-          suggestedGoal: { type: Type.STRING },
-          suggestedAdditionalInfo: { type: Type.STRING }
-        },
-        required: ["suggestedTheme", "suggestedFormat", "suggestedGoal", "suggestedAdditionalInfo"]
-      }
-    }
-  });
-  return JSON.parse(response.text || '{}');
+  const data = JSON.parse(response.text || '[]');
+  return data.map((g: any) => ({ ...g, label: sanitize(g.label) }));
 };
 
 export const getDeepAudit = async (settings: UserSettings, history: string[]): Promise<string> => {
   const ai = getAiClient();
+  const prompt = `Realize uma auditoria profunda da estratégia de conteúdo de ${settings.businessName}. 
+    Histórico de temas: ${history.join(', ')}. Identifique padrões e melhorias.`;
+  
   const response = await ai.models.generateContent({ 
     model: "gemini-3-pro-preview", 
-    contents: `Auditoria 360: ${settings.businessName} (${settings.niche}). Histórico: ${history.join(", ")}.`
+    contents: prompt 
   });
-  return response.text || "";
+  return sanitize(response.text || "");
 };
 
-export const getDashboardFeedback = async (settings: UserSettings, metrics: any): Promise<string> => {
+export const getManagementDiagnosis = async (
+  settings: UserSettings,
+  metrics: DashboardMetric[],
+  goals: Goal[],
+  history: HistoryItem[],
+  notes: Note[]
+): Promise<string> => {
   const ai = getAiClient();
+  const prompt = `Diagnóstico Estratégico Completo para ${settings.businessName}. 
+    Métricas: ${JSON.stringify(metrics)}
+    Metas: ${JSON.stringify(goals)}
+    Posts: ${JSON.stringify(history.map(h => h.topic))}
+    Notas/Ideias: ${JSON.stringify(notes.map(n => n.text))}`;
+  
   const response = await ai.models.generateContent({ 
-    model: "gemini-3-flash-preview", 
-    contents: `Analise métricas: ${JSON.stringify(metrics)}. Texto limpo, sem markdown.` 
+    model: "gemini-3-pro-preview", 
+    contents: prompt 
   });
-  return response.text || "";
+  return sanitize(response.text || "");
 };
 
-export const generateAgentTip = async (settings: UserSettings): Promise<string> => {
+export const strategicResearch = async (settings: UserSettings, query: string): Promise<string> => {
   const ai = getAiClient();
-  const response = await ai.models.generateContent({ 
-    model: "gemini-3-flash-preview", 
-    contents: `Dica tática curta para ${settings.niche}.` 
-  });
-  return response.text || "";
-};
-
-export const generateCalendar = async (settings: UserSettings, plan: string, duration: string): Promise<CalendarDay[]> => {
-  const ai = getAiClient();
+  const prompt = `Pesquisa de mercado e tendências estratégicas para ${settings.businessName}: ${query}`;
+  
   const response = await ai.models.generateContent({
     model: "gemini-3-pro-preview",
-    contents: `Calendário ${duration} para ${settings.niche}. Foco: ${plan}.`,
+    contents: prompt,
     config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            day: { type: Type.STRING },
-            topic: { type: Type.STRING },
-            type: { type: Type.STRING, enum: ["POST", "REELS", "STORY"] },
-            brief: { type: Type.STRING },
-            bestTime: { type: Type.STRING }
-          },
-          required: ["day", "topic", "type", "brief"]
-        }
-      }
+      tools: [{ googleSearch: {} }]
     }
   });
-  return JSON.parse(response.text || '[]').map((d: any) => ({ ...d, id: Math.random().toString(36).substr(2, 9) }));
-};
-
-export const analyzeBusinessProfile = async (businessName: string, city: string, description: string): Promise<any> => {
-  const ai = getAiClient();
-  const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: `Analise: ${description}.`,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          niche: { type: Type.STRING },
-          audience: { type: Type.STRING },
-          tone: { type: Type.STRING }
-        },
-        required: ["niche", "audience", "tone"]
-      }
-    }
-  });
-  return JSON.parse(response.text || '{}');
-};
-
-export const repurposeContent = async (originalContent: string, targetFormat: string, settings: UserSettings): Promise<string> => {
-  const ai = getAiClient();
-  const prompt = `
-    Aja como um Editor Sênior. Recicle o seguinte conteúdo para o formato: ${targetFormat}.
-    Conteúdo Original: "${originalContent}"
-    Nicho: ${settings.niche}. Tom: ${settings.tone}.
-    Retorne APENAS o novo conteúdo adaptado, pronto para copiar e colar. Texto Limpo.
-  `;
-  const response = await ai.models.generateContent({ model: "gemini-3-flash-preview", contents: prompt });
-  return response.text || "Erro ao reciclar conteúdo.";
-};
-
-export const simulateCritique = async (content: string, settings: UserSettings): Promise<string> => {
-  const ai = getAiClient();
-  const prompt = `
-    SIMULADOR DE PERSONA: "O CLIENTE DIFÍCIL".
-    Aja como o público-alvo deste post: ${settings.audience}. Você é cético, ocupado e exigente.
-    Conteúdo para avaliar: "${content}"
-    
-    TAREFA:
-    Critique este conteúdo. Diga por que você passaria direto ou por que não clicaria.
-    Seja duro, mas construtivo. Use 1 parágrafo curto.
-    Comece com: "Eu não clicaria porque..."
-    Texto Limpo.
-  `;
-  const response = await ai.models.generateContent({ model: "gemini-3-pro-preview", contents: prompt });
-  return response.text || "Sem crítica disponível.";
+  return sanitize(response.text || "");
 };
