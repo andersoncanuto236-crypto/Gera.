@@ -1,279 +1,196 @@
 
 import React, { useState } from 'react';
 import { UserSettings, GeneratedContent } from '../types';
-import { generatePost, multiplyContent, remixContent } from '../services/geminiService';
+import { generatePostV1 } from '../services/geminiService';
 import { SecureStorage } from '../services/security';
-import Teleprompter from './Teleprompter';
 
-const Generator: React.FC<{ settings: UserSettings }> = ({ settings }) => {
-  // Modes: Scratch vs Robin Hood
-  const [mode, setMode] = useState<'scratch' | 'remix'>('scratch');
+interface GeneratorProps {
+  settings: UserSettings;
+  onOpenTeleprompter?: (text: string) => void;
+}
 
+const Generator: React.FC<GeneratorProps> = ({ settings, onOpenTeleprompter }) => {
   // Input States
-  const [topic, setTopic] = useState('');
-  const [remixSource, setRemixSource] = useState('');
-  const [type, setType] = useState<'POST' | 'REELS' | 'STORY'>('POST');
-  const [goal, setGoal] = useState('Venda');
+  const [objective, setObjective] = useState('');
+  const [platform, setPlatform] = useState('Instagram');
+  const [context, setContext] = useState('');
   
   // Processing States
   const [loading, setLoading] = useState(false);
-  const [multiplying, setMultiplying] = useState(false);
-  
-  // Result States
   const [result, setResult] = useState<GeneratedContent | null>(null);
-  const [displayTab, setDisplayTab] = useState<'original' | 'reels' | 'story' | 'linkedin'>('original');
-
-  // Utility States
-  const [showTeleprompter, setShowTeleprompter] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleGenerate = async () => {
-    if (mode === 'scratch' && !topic) return;
-    if (mode === 'remix' && !remixSource) return;
+    if (!objective) return;
 
     setLoading(true);
     setResult(null);
-    setDisplayTab('original');
+    setError(null);
 
     try {
-      let res: GeneratedContent;
-      
-      if (mode === 'scratch') {
-        res = await generatePost(settings, topic, type, goal);
-      } else {
-        // Robin Hood Mode
-        res = await remixContent(settings, remixSource, type);
-      }
-      
+      const res = await generatePostV1(settings, objective, platform, context);
       setResult(res);
-      saveToHistory(res, mode === 'scratch' ? topic : 'Remix Robin Hood');
-    } catch (e) {
-      alert("Erro ao gerar conteúdo. Verifique sua conexão.");
+      
+      // Save to History
+      const history = SecureStorage.getItem('history') || [];
+      SecureStorage.setItem('history', [
+        { id: Date.now().toString(), timestamp: Date.now(), content: res },
+        ...history
+      ]);
+
+    } catch (e: any) {
+      console.error(e);
+      let msg = "Não foi possível gerar o conteúdo agora.";
+      setError(msg);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleMultiply = async () => {
-    if (!result) return;
-    setMultiplying(true);
-    try {
-      const multipliedData = await multiplyContent(settings, result);
-      const updatedResult = { ...result, multiplied: multipliedData };
-      setResult(updatedResult);
-      setDisplayTab('reels'); // Auto switch to show magic
-      
-      // Update history
-      const history = SecureStorage.getItem('history') || [];
-      if (history.length > 0) {
-        history[0].content = updatedResult; // Update most recent
-        SecureStorage.setItem('history', history);
-      }
-
-    } catch (e) {
-      alert("Erro ao multiplicar conteúdo.");
-    } finally {
-      setMultiplying(false);
-    }
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    alert("Conteúdo copiado!");
   };
 
-  const saveToHistory = (content: GeneratedContent, topicLabel: string) => {
-    const history = SecureStorage.getItem('history') || [];
-    SecureStorage.setItem('history', [{ id: Date.now().toString(), topic: topicLabel, content, timestamp: Date.now() }, ...history]);
-  };
-
-  // Helper to get text for teleprompter depending on active tab
-  const getTeleprompterText = () => {
-    if (!result) return '';
-    if (displayTab === 'original') return result.caption;
-    if (displayTab === 'reels') return result.multiplied?.reelsScript || '';
-    if (displayTab === 'story') return (result.multiplied?.storySequence || []).join('\n\n---\n\n');
-    if (displayTab === 'linkedin') return result.multiplied?.linkedinText || '';
-    return '';
-  };
-
-  const inputClasses = "w-full bg-white border-2 border-black rounded-2xl p-4 text-black font-bold outline-none focus:ring-4 focus:ring-brand-500/20 transition-all";
+  const objectives = [
+    { id: 'Venda', icon: 'fa-shopping-cart', label: 'Vender', desc: 'Oferta direta e conversão' },
+    { id: 'Autoridade', icon: 'fa-star', label: 'Posicionar', desc: 'Mostrar expertise e confiança' },
+    { id: 'Educar', icon: 'fa-book-open', label: 'Educar', desc: 'Ensinar algo ao público' },
+    { id: 'Engajamento', icon: 'fa-comments', label: 'Engajar', desc: 'Gerar comentários e likes' },
+  ];
 
   return (
-    <div className="max-w-4xl mx-auto space-y-10 animate-fade-in pb-24">
-      <div className="text-center">
-        <h2 className="text-4xl font-black text-white tracking-tighter">Criar Conteúdo</h2>
-        <p className="text-slate-500 text-xs font-black uppercase tracking-widest mt-2">Pilar 03: Execução</p>
-      </div>
-
-      {/* Input Section */}
-      <div className="glass-panel p-1 rounded-[40px] relative">
-        {/* Mode Switcher */}
-        <div className="flex bg-black/20 p-1.5 rounded-[38px] mb-2 mx-1 mt-1">
-           <button 
-             onClick={() => setMode('scratch')} 
-             className={`flex-1 py-3 rounded-[34px] text-xs font-black uppercase tracking-widest transition-all ${mode === 'scratch' ? 'bg-white text-black shadow-lg' : 'text-slate-500 hover:text-white'}`}
-           >
-             <i className="fas fa-pen-nib mr-2"></i> Do Zero
-           </button>
-           <button 
-             onClick={() => setMode('remix')} 
-             className={`flex-1 py-3 rounded-[34px] text-xs font-black uppercase tracking-widest transition-all ${mode === 'remix' ? 'bg-brand-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
-           >
-             <i className="fas fa-bow-arrow mr-2"></i> Robin Hood (Remix)
-           </button>
-        </div>
-
-        <div className="p-8 space-y-6">
-          {mode === 'scratch' ? (
-            <div className="space-y-4">
-              <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">O que vamos comunicar?</label>
-              <input value={topic} onChange={e => setTopic(e.target.value)} placeholder="Ex: Benefícios da consultoria..." className={inputClasses} />
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <label className="text-[10px] font-black uppercase text-brand-500 tracking-widest ml-1"><i className="fas fa-shield-alt"></i> Anti-Plágio Ativo</label>
-              </div>
-              <textarea 
-                value={remixSource} 
-                onChange={e => setRemixSource(e.target.value)} 
-                placeholder="Cole aqui o texto do concorrente ou referência. A IA irá reescrever com seu tom de voz e nicho..." 
-                className={`${inputClasses} h-32 resize-none leading-relaxed`} 
-              />
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-6">
-            <div className="space-y-2">
-               <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Formato Final</label>
-               <select value={type} onChange={e => setType(e.target.value as any)} className={inputClasses}>
-                 <option value="POST">Post Estático</option>
-                 <option value="REELS">Reels / Vídeo</option>
-                 <option value="STORY">Story</option>
-               </select>
-            </div>
-            <div className="space-y-2">
-               <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Objetivo</label>
-               <select value={goal} onChange={e => setGoal(e.target.value)} className={inputClasses}>
-                 <option value="Venda">Venda</option>
-                 <option value="Autoridade">Autoridade</option>
-                 <option value="Engajamento">Engajamento</option>
-               </select>
-            </div>
-          </div>
-
-          <button 
-            onClick={handleGenerate} 
-            disabled={loading || (mode === 'scratch' ? !topic : !remixSource)}
-            className="w-full py-5 bg-brand-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-brand-500/20 disabled:opacity-50 hover:bg-brand-500 transition-colors"
-          >
-            {loading ? <i className="fas fa-spinner fa-spin"></i> : (mode === 'scratch' ? 'Gerar Conteúdo' : 'Remixar Conteúdo')}
-          </button>
-        </div>
-      </div>
-
-      {/* Result Section */}
-      {result && (
-        <div className="glass-panel-light p-8 rounded-[40px] animate-fade-in-up space-y-6 relative border-4 border-white/50">
-          
-          {/* Action Bar (Multiply) */}
-          {!result.multiplied ? (
-             <div className="bg-brand-50 p-6 rounded-[32px] flex items-center justify-between gap-4 border border-brand-100">
-               <div>
-                 <h4 className="text-brand-800 font-black text-sm uppercase tracking-wider">Multiplicador de Conteúdo</h4>
-                 <p className="text-brand-600 text-xs">Transforme este post em 3 formatos (Reels, Story, LinkedIn) com 1 clique.</p>
-               </div>
-               <button 
-                 onClick={handleMultiply}
-                 disabled={multiplying}
-                 className="bg-brand-600 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg hover:scale-105 transition-all"
-               >
-                 {multiplying ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-layer-group mr-2"></i> Multiplicar</>}
-               </button>
-             </div>
-          ) : (
-             // Tabs for Multiplied Content
-             <div className="flex bg-gray-100 p-1 rounded-2xl overflow-x-auto">
-               {[
-                 { id: 'original', label: 'Original', icon: 'fa-file-alt' },
-                 { id: 'reels', label: 'Roteiro Reels', icon: 'fa-video' },
-                 { id: 'story', label: 'Seq. Stories', icon: 'fa-images' },
-                 { id: 'linkedin', label: 'LinkedIn', icon: 'fa-briefcase' },
-               ].map(tab => (
-                 <button 
-                   key={tab.id}
-                   onClick={() => setDisplayTab(tab.id as any)}
-                   className={`flex-1 py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all flex items-center justify-center gap-2 ${displayTab === tab.id ? 'bg-white text-brand-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
-                 >
-                   <i className={`fas ${tab.icon}`}></i> {tab.label}
-                 </button>
-               ))}
-             </div>
-          )}
-
-          {/* Content Display Area */}
-          <div className="space-y-4 text-slate-900 min-h-[200px]">
-             {displayTab === 'original' && (
-               <>
-                 <div className="flex justify-between items-start">
-                    <p className="text-2xl font-black">"{result.hook}"</p>
-                    <span className="bg-brand-600 text-white px-3 py-1 rounded-full text-[9px] font-black uppercase">{result.type}</span>
-                 </div>
-                 <p className="text-sm font-medium leading-relaxed whitespace-pre-line bg-gray-50 p-6 rounded-3xl border border-gray-100">{result.caption}</p>
-                 <p className="text-[10px] font-black uppercase text-brand-600 tracking-widest"><i className="fas fa-camera mr-1"></i> Visual: {result.imageSuggestion}</p>
-               </>
-             )}
-
-             {displayTab === 'reels' && result.multiplied?.reelsScript && (
-               <div className="bg-gray-900 text-white p-8 rounded-3xl border border-gray-800 relative overflow-hidden">
-                 <div className="absolute top-0 right-0 w-20 h-20 bg-brand-500/20 rounded-full blur-xl"></div>
-                 <h5 className="text-[10px] font-black uppercase tracking-widest text-brand-400 mb-4">Roteiro de 30s</h5>
-                 <p className="whitespace-pre-line leading-relaxed font-medium">{result.multiplied.reelsScript}</p>
-               </div>
-             )}
-
-             {displayTab === 'story' && result.multiplied?.storySequence && (
-               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                 {result.multiplied.storySequence.map((story, i) => (
-                   <div key={i} className="bg-gradient-to-br from-purple-500 to-pink-500 p-6 rounded-3xl text-white shadow-lg relative">
-                      <span className="absolute top-4 right-4 text-white/50 text-4xl font-black">{i+1}</span>
-                      <p className="text-sm font-bold mt-4 leading-snug">{story}</p>
-                   </div>
-                 ))}
-               </div>
-             )}
-
-             {displayTab === 'linkedin' && result.multiplied?.linkedinText && (
-               <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100 text-blue-900">
-                  <i className="fab fa-linkedin text-2xl mb-4 text-blue-700"></i>
-                  <p className="whitespace-pre-line font-medium text-sm leading-relaxed">{result.multiplied.linkedinText}</p>
-               </div>
-             )}
-          </div>
-          
-          {/* Action Buttons Footer */}
-          <div className="flex gap-4 border-t border-gray-100 pt-6">
-            <button 
-              onClick={() => navigator.clipboard.writeText(getTeleprompterText())} 
-              className="flex-1 py-4 bg-gray-100 text-slate-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-200 transition"
-            >
-              <i className="far fa-copy mr-2"></i> Copiar Texto
-            </button>
-            
-            {/* Teleprompter Trigger - Only visible for scripts/text heavy formats */}
-            {(displayTab === 'reels' || displayTab === 'original') && (
-              <button 
-                onClick={() => setShowTeleprompter(true)} 
-                className="flex-1 py-4 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-all shadow-xl flex items-center justify-center gap-2"
-              >
-                <i className="fas fa-video"></i> Gravar (Teleprompter)
-              </button>
-            )}
-          </div>
+    <div className="max-w-3xl mx-auto space-y-10 animate-fade-in pb-24">
+      {/* Header */}
+      {!result && (
+        <div className="text-center">
+          <h2 className="text-3xl font-black text-white tracking-tighter uppercase">Criar Conteúdo</h2>
+          <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-2">Foco Estratégico & Tom de Voz</p>
         </div>
       )}
 
-      {/* Teleprompter Overlay */}
-      {showTeleprompter && (
-        <Teleprompter 
-          text={getTeleprompterText()} 
-          onClose={() => setShowTeleprompter(false)} 
-        />
+      {!result ? (
+        <div className="space-y-8">
+          {error && (
+            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-200 text-center text-sm font-bold">
+              <i className="fas fa-exclamation-circle mr-2"></i> {error}
+            </div>
+          )}
+
+          {/* Step 1: Objective */}
+          <div className="grid grid-cols-2 gap-4">
+            {objectives.map((obj) => (
+              <button
+                key={obj.id}
+                onClick={() => setObjective(obj.id)}
+                className={`p-6 rounded-[32px] border text-left transition-all duration-300 group ${
+                  objective === obj.id 
+                    ? 'bg-brand-600 border-brand-500 text-white shadow-xl scale-[1.02]' 
+                    : 'bg-white/5 border-white/5 text-slate-400 hover:bg-white/10 hover:border-white/20'
+                }`}
+              >
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg mb-3 ${
+                   objective === obj.id ? 'bg-white text-brand-600' : 'bg-black/20'
+                }`}>
+                  <i className={`fas ${obj.icon}`}></i>
+                </div>
+                <h3 className={`font-black uppercase text-xs mb-1 ${objective === obj.id ? 'text-white' : 'text-slate-300'}`}>{obj.label}</h3>
+                <p className={`text-[9px] font-medium leading-tight ${objective === obj.id ? 'text-brand-100' : 'text-slate-500'}`}>{obj.desc}</p>
+              </button>
+            ))}
+          </div>
+
+          {/* Step 2 & 3: Platform & Context */}
+          <div className="glass-panel p-6 rounded-[32px] space-y-6">
+             <div className="flex gap-2 bg-black/20 p-1.5 rounded-2xl">
+               {['Instagram', 'LinkedIn', 'YouTube', 'TikTok'].map(p => (
+                 <button 
+                   key={p} 
+                   onClick={() => setPlatform(p)}
+                   className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition ${
+                     platform === p ? 'bg-white text-brand-900 shadow-md' : 'text-slate-500 hover:text-white'
+                   }`}
+                 >
+                   {p}
+                 </button>
+               ))}
+             </div>
+
+             <textarea 
+               value={context}
+               onChange={e => setContext(e.target.value)}
+               placeholder="Contexto opcional (ex: Promoção de Black Friday, lançamento de curso...)"
+               className="w-full bg-slate-900/50 border border-white/5 rounded-2xl p-4 text-white placeholder-slate-600 text-sm outline-none focus:border-brand-500 transition h-24 resize-none"
+             />
+
+             <button 
+               onClick={handleGenerate}
+               disabled={loading || !objective}
+               className="w-full py-5 bg-brand-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-brand-500/20 disabled:opacity-50 hover:bg-brand-500 transition-all flex items-center justify-center gap-3 active:scale-95"
+             >
+               {loading ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-bolt"></i> Gerar Conteúdo Premium</>}
+             </button>
+          </div>
+        </div>
+      ) : (
+        // Result View
+        <div className="animate-fade-in-up space-y-6 pb-12">
+          <div className="glass-panel-light p-8 rounded-[40px] border-4 border-white/50 shadow-2xl relative">
+             <div className="flex justify-between items-start mb-6">
+               <span className="bg-brand-600 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">{result.type} • {result.platform}</span>
+               <button onClick={() => setResult(null)} className="text-slate-400 hover:text-red-500 transition"><i className="fas fa-times text-xl"></i></button>
+             </div>
+
+             <div className="space-y-6 text-slate-900">
+               <div>
+                 <p className="text-[10px] font-black uppercase text-brand-600 tracking-widest mb-1">Estratégia sugerida</p>
+                 <p className="text-sm font-medium text-slate-500 leading-snug">{result.metaObjective}</p>
+               </div>
+
+               <div>
+                  <p className="text-[10px] font-black uppercase text-brand-600 tracking-widest mb-2">Conteúdo Final</p>
+                  <div className="bg-gray-50 p-6 rounded-3xl border border-gray-100 whitespace-pre-line font-medium text-base leading-relaxed text-gray-800">
+                    {result.content}
+                  </div>
+               </div>
+
+               {result.cta && (
+                 <div className="bg-brand-50 p-4 rounded-2xl flex items-center gap-4 border border-brand-100">
+                   <div className="w-8 h-8 rounded-full bg-brand-200 flex items-center justify-center text-brand-700 text-xs shadow-sm"><i className="fas fa-bullhorn"></i></div>
+                   <div>
+                      <p className="text-[9px] font-black uppercase text-brand-700 tracking-widest">Chamada para Ação</p>
+                      <p className="text-sm font-bold text-brand-900">{result.cta}</p>
+                   </div>
+                 </div>
+               )}
+             </div>
+
+             <div className="pt-8 flex flex-col sm:flex-row gap-4">
+               <button onClick={() => copyToClipboard(result.content)} className="flex-1 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition shadow-xl active:scale-95">
+                 <i className="far fa-copy mr-2"></i> Copiar Texto
+               </button>
+               
+               {onOpenTeleprompter && (
+                 <button 
+                  onClick={() => onOpenTeleprompter(result.content)} 
+                  className="flex-1 py-4 bg-brand-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-brand-500 transition shadow-xl active:scale-95 flex items-center justify-center gap-2"
+                >
+                  <i className="fas fa-video"></i> Grave com Teleprompter
+                </button>
+               )}
+               
+               <button onClick={() => setResult(null)} className="px-6 py-4 bg-gray-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-200 transition active:scale-95">
+                 Recriar
+               </button>
+             </div>
+          </div>
+          
+          <div className="bg-white/5 p-6 rounded-3xl border border-white/5 text-center">
+             <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest italic leading-relaxed">
+               Dica: O teleprompter ajuda a manter o contato visual com a câmera enquanto você lê seu roteiro perfeito.
+             </p>
+          </div>
+        </div>
       )}
     </div>
   );

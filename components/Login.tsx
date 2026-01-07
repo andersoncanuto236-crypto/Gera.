@@ -20,38 +20,27 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleGoogleLogin = async () => {
+  const handleAccess = async () => {
     setLoading(true);
     setError('');
 
     try {
-      if ((window as any).aistudio) {
-        try {
-          const hasKey = await (window as any).aistudio.hasSelectedApiKey();
-          if (!hasKey) {
-             await (window as any).aistudio.openSelectKey();
-          }
-        } catch (err) {
-          console.warn("Ambiente AI Studio não detectado.");
-        }
-      }
+      // Simulação de delay para feedback visual
+      await new Promise(resolve => setTimeout(resolve, 800));
 
-      // Simulação de login com delay para feedback visual
-      await new Promise(resolve => setTimeout(resolve, 1200));
-
-      const googleUser = {
+      const userSession = {
         name: "Estrategista",
-        email: "user@example.com",
-        avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&h=100",
-        token: `gs-auth-${Math.random().toString(36).substring(7)}`
+        email: "user@gera.app",
+        avatar: "", // Avatar padrão será gerado pela UI
+        token: `gs-session-${Math.random().toString(36).substring(7)}`
       };
 
-      // Armazenamento com validação de integridade
-      SecureStorage.setItem('session', googleUser);
-      onLogin(googleUser.name, googleUser.avatar);
+      // Armazenamento seguro da sessão
+      SecureStorage.setItem('session', userSession);
+      onLogin(userSession.name, userSession.avatar);
 
     } catch (err) {
-      setError('Erro ao conectar. Tente novamente.');
+      setError('Erro ao iniciar sessão. Tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -67,18 +56,20 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           <LogoIcon className="mx-auto mb-6 animate-float" size={80} />
           <h1 className="text-5xl font-black text-white tracking-tighter mb-2">Gera<span className="text-brand-500">.</span></h1>
           <p className="text-slate-400 font-medium text-sm px-4 leading-relaxed">
-            Gestão estratégica e inteligente para acelerar sua presença digital com segurança.
+            Seu estrategista de conteúdo com IA.
           </p>
         </div>
         <div className="space-y-6">
           {error && <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-200 text-[10px] font-bold uppercase tracking-widest">{error}</div>}
-          <button onClick={handleGoogleLogin} disabled={loading} className="w-full bg-white text-slate-900 h-16 rounded-3xl font-black text-xs uppercase tracking-widest shadow-xl flex items-center justify-center gap-4 hover:scale-[1.02] active:scale-95 transition-all duration-300 disabled:opacity-50">
+          
+          <button onClick={handleAccess} disabled={loading} className="w-full bg-white text-slate-900 h-16 rounded-3xl font-black text-xs uppercase tracking-widest shadow-xl flex items-center justify-center gap-4 hover:scale-[1.02] active:scale-95 transition-all duration-300 disabled:opacity-50">
             {loading ? <i className="fas fa-circle-notch fa-spin text-brand-500 text-lg"></i> : (
-              <><img src="https://www.google.com/favicon.ico" alt="G" className="w-5 h-5" /><span>Entrar no Dashboard</span></>
+              <><span>Acessar Plataforma</span> <i className="fas fa-arrow-right"></i></>
             )}
           </button>
+          
           <p className="text-[9px] text-slate-600 font-bold uppercase tracking-widest leading-loose px-8">
-            Verificamos a integridade dos seus dados localmente a cada sessão. Estratégia protegida e resiliente.
+            Ambiente seguro. Suas estratégias são processadas com privacidade.
           </p>
         </div>
       </div>

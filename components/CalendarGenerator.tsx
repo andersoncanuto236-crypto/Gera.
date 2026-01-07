@@ -53,7 +53,7 @@ const CalendarGenerator: React.FC<CalendarGeneratorProps> = ({ settings, onActio
   };
   
   const toggleStatus = (id: string) => {
-    const updated = days.map(d => d.id === id ? { ...d, status: d.status === 'done' ? 'pending' : 'done' } : d);
+    const updated = days.map(d => d.id === id ? { ...d, status: (d.status === 'done' ? 'pending' : 'done') as 'pending' | 'done' } : d);
     saveDays(updated);
   };
 
@@ -91,7 +91,8 @@ const CalendarGenerator: React.FC<CalendarGeneratorProps> = ({ settings, onActio
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <button 
-          onClick={() => saveDays([...days, { id: Math.random().toString(), date: new Date().toISOString().split('T')[0], day: 'Hoje', topic: 'Novo Post', type: 'POST', brief: 'Descrição...', status: 'pending' }])}
+          // Explicitly cast status to literal to avoid string inference error
+          onClick={() => saveDays([...days, { id: Math.random().toString(), date: new Date().toISOString().split('T')[0], day: 'Hoje', topic: 'Novo Post', type: 'POST', brief: 'Descrição...', status: 'pending' as const }])}
           className="glass-panel rounded-[40px] border-dashed border-white/20 flex flex-col items-center justify-center p-10 min-h-[400px] text-slate-500 hover:text-white transition-all group"
         >
           <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4 group-hover:bg-brand-600 group-hover:scale-110 transition">

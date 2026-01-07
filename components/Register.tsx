@@ -18,12 +18,14 @@ const Register: React.FC<{ settings: UserSettings }> = ({ settings }) => {
   };
 
   const updateResult = (id: string, notes: string) => {
-    const updated = items.map(i => i.id === id ? { ...i, resultNotes: notes, status: 'done' as const } : i);
+    // Explicitly typing updated as CalendarDay[] to avoid inference issues with the spread operator
+    const updated: CalendarDay[] = items.map(i => i.id === id ? { ...i, resultNotes: notes, status: 'done' as const } : i);
     saveItems(updated);
   };
 
   const toggleStatus = (id: string) => {
-    const updated = items.map(i => i.id === id ? { ...i, status: i.status === 'done' ? 'pending' : 'done' as const } : i);
+    // Casting the result of the ternary to the expected literal union type to prevent string inference
+    const updated: CalendarDay[] = items.map(i => i.id === id ? { ...i, status: (i.status === 'done' ? 'pending' : 'done') as 'pending' | 'done' } : i);
     saveItems(updated);
   };
 
