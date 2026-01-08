@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { UserSettings, UserPlan } from '../types';
+import { UserSettings } from '../types';
 
 interface SettingsModalProps {
   settings: UserSettings;
@@ -9,8 +9,7 @@ interface SettingsModalProps {
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ settings, onSave, isOpen }) => {
-  // Inicializa o plano como FREE se não estiver definido
-  const [formData, setFormData] = useState<UserSettings>({ ...settings, plan: settings.plan || 'FREE' });
+  const [formData, setFormData] = useState<UserSettings>(settings);
   const [error, setError] = useState('');
 
   if (!isOpen) return null;
@@ -86,25 +85,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ settings, onSave, isOpen 
              </select>
           </div>
           
-          {/* Seletor de Plano Simulado para Onboarding */}
-          <div className="pt-2 pb-2">
-             <label className={labelClasses}>Plano Inicial</label>
-             <div className="grid grid-cols-2 gap-4">
-               <button 
-                 onClick={() => setFormData({...formData, plan: 'FREE'})}
-                 className={`p-4 rounded-xl border flex flex-col items-center gap-2 ${formData.plan === 'FREE' ? 'bg-white text-slate-900 border-white' : 'bg-white/5 border-white/5 text-slate-500'}`}
-               >
-                 <span className="font-black uppercase text-xs">Free (Manual)</span>
-               </button>
-               <button 
-                 onClick={() => setFormData({...formData, plan: 'PAID'})}
-                 className={`p-4 rounded-xl border flex flex-col items-center gap-2 ${formData.plan === 'PAID' ? 'bg-brand-600 text-white border-brand-500' : 'bg-white/5 border-white/5 text-slate-500'}`}
-               >
-                 <span className="font-black uppercase text-xs">Starter (IA)</span>
-               </button>
-             </div>
-          </div>
-
           <div className="pt-4">
             <button 
               onClick={handleSave} 

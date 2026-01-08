@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { UserSettings, GeneratedContent } from '../types';
+import { canUseAI } from '../src/lib/plan';
 import { generatePostV1, generateScript } from '../services/geminiService';
 import { SecureStorage, getSessionKey } from '../services/security';
 import PaywallModal from './PaywallModal';
@@ -9,7 +10,7 @@ import ConnectAIModal from './ConnectAIModal';
 interface GeneratorProps {
   settings: UserSettings;
   onOpenTeleprompter?: (text: string) => void;
-  onUpdatePlan: (plan: 'PAID') => void;
+  onUpdatePlan: (plan?: 'PAID') => void;
 }
 
 const Generator: React.FC<GeneratorProps> = ({ settings, onOpenTeleprompter, onUpdatePlan }) => {
@@ -37,7 +38,7 @@ const Generator: React.FC<GeneratorProps> = ({ settings, onOpenTeleprompter, onU
 
   // Switch Mode Logic
   const handleModeSwitch = (newMode: 'MANUAL' | 'IA') => {
-    if (newMode === 'IA' && settings.plan === 'FREE') {
+    if (newMode === 'IA' && !canUseAI(settings.plan)) {
       setShowPaywall(true);
       return;
     }
@@ -47,7 +48,6 @@ const Generator: React.FC<GeneratorProps> = ({ settings, onOpenTeleprompter, onU
   const handleUpgrade = () => {
      onUpdatePlan('PAID');
      setShowPaywall(false);
-     setMode('IA');
   };
 
   const executeGeneration = async () => {
@@ -93,7 +93,7 @@ const Generator: React.FC<GeneratorProps> = ({ settings, onOpenTeleprompter, onU
     }
 
     // IA Mode Check
-    if (settings.plan === 'FREE') {
+    if (!canUseAI(settings.plan)) {
        setShowPaywall(true);
        return;
     }
@@ -108,7 +108,7 @@ const Generator: React.FC<GeneratorProps> = ({ settings, onOpenTeleprompter, onU
 
   const handleConvertToScript = async () => {
      if (!result) return;
-     if (settings.plan === 'FREE') {
+     if (!canUseAI(settings.plan)) {
         setShowPaywall(true);
         return;
      }
@@ -169,7 +169,7 @@ const Generator: React.FC<GeneratorProps> = ({ settings, onOpenTeleprompter, onU
                 onClick={() => handleModeSwitch('IA')}
                 className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${mode === 'IA' ? 'bg-brand-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
               >
-                <i className="fas fa-bolt"></i> IA Automática {settings.plan === 'FREE' && <i className="fas fa-lock text-[8px] opacity-50 ml-1"></i>}
+                <i className="fas fa-bolt"></i> IA Automática {!canUseAI(settings.plan) && <i className="fas fa-lock text-[8px] opacity-50 ml-1"></i>}
               </button>
            </div>
         </div>
@@ -325,7 +325,7 @@ const Generator: React.FC<GeneratorProps> = ({ settings, onOpenTeleprompter, onU
                {/* "Melhorar com IA" só aparece no modo manual ou se o usuario quiser refinar. Botão protegido */}
                <button onClick={handleConvertToScript} disabled={loading} className="px-6 py-4 bg-gray-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-200 transition active:scale-95 group relative">
                  {loading ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-magic text-brand-500"></i>}
-                 {settings.plan === 'FREE' && <div className="absolute -top-1 -right-1 bg-black text-white text-[8px] p-1 rounded-full"><i className="fas fa-lock"></i></div>}
+                 {!canUseAI(settings.plan) && <div className="absolute -top-1 -right-1 bg-black text-white text-[8px] p-1 rounded-full"><i className="fas fa-lock"></i></div>}
                </button>
              </div>
           </div>

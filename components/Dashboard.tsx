@@ -4,7 +4,7 @@ import { UserSettings } from '../types';
 
 interface DashboardProps {
   settings: UserSettings;
-  onNavigate: (view: 'create') => void;
+  onNavigate: (path: string) => void;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigate }) => {
@@ -31,7 +31,7 @@ const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigate }) => {
 
            <div className="pt-4 space-y-4">
              <button 
-               onClick={() => onNavigate('create')}
+               onClick={() => onNavigate('/app/create')}
                className="w-full py-6 bg-brand-600 text-white rounded-3xl font-black uppercase tracking-widest text-sm shadow-2xl shadow-brand-500/20 hover:bg-brand-500 transition-all flex items-center justify-center gap-3"
              >
                <i className="fas fa-plus-circle text-lg"></i>
