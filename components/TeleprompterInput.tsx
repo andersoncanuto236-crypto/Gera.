@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { UserSettings } from '../types';
+import { canUseAI } from '../src/lib/plan';
 import { generateScript } from '../services/geminiService';
 import { getSessionKey } from '../services/security';
 import PaywallModal from './PaywallModal';
@@ -9,7 +10,7 @@ import ConnectAIModal from './ConnectAIModal';
 interface TeleprompterInputProps {
   settings: UserSettings;
   onStart: (text: string) => void;
-  onUpdatePlan: (plan: 'PAID') => void;
+  onUpdatePlan: (plan?: 'PAID') => void;
 }
 
 const TeleprompterInput: React.FC<TeleprompterInputProps> = ({ settings, onStart, onUpdatePlan }) => {
@@ -38,7 +39,7 @@ const TeleprompterInput: React.FC<TeleprompterInputProps> = ({ settings, onStart
 
   const handleGenerate = async () => {
     if (!topic) return;
-    if (settings.plan === 'FREE') {
+    if (!canUseAI(settings.plan)) {
       setShowPaywall(true);
       return;
     }
@@ -77,7 +78,7 @@ const TeleprompterInput: React.FC<TeleprompterInputProps> = ({ settings, onStart
           <div className="space-y-4">
              <div className="flex justify-between items-center">
                <label className="text-[10px] font-black text-brand-500 uppercase tracking-widest ml-2">Opção A: Gerar com IA</label>
-               {settings.plan === 'FREE' && <span className="bg-white/10 px-2 py-1 rounded text-[8px] uppercase font-bold text-white"><i className="fas fa-lock mr-1"></i> Starter</span>}
+               {!canUseAI(settings.plan) && <span className="bg-white/10 px-2 py-1 rounded text-[8px] uppercase font-bold text-white"><i className="fas fa-lock mr-1"></i> Starter</span>}
              </div>
              <div className="flex gap-2 relative">
                <input 
