@@ -65,7 +65,7 @@ const AppShell: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col bg-[#0D171D] text-slate-200 font-sans">
       {needsOnboarding && (
-        <SettingsModal isOpen settings={settings} onSave={handleSaveSettings} />
+        <SettingsModal isOpen={true} settings={settings} onSave={handleSaveSettings} />
       )}
 
       {teleprompterText && (
@@ -101,7 +101,17 @@ const AppShell: React.FC = () => {
 
       <main className="flex-1 p-6 pt-28 max-w-5xl mx-auto w-full">
         <Routes>
-          <Route path="/app" element={<Dashboard settings={settings} onNavigate={navigate} />} />
+          <Route
+            path="/app"
+            element={
+              <>
+                <Dashboard settings={settings} onNavigate={(path) => navigate(path)} />
+                <div className="mt-10">
+                  <SupabaseDataPanel />
+                </div>
+              </>
+            }
+          />
           <Route path="/app/create" element={<Generator settings={settings} onUpdatePlan={handleUpgrade} />} />
           <Route path="/app/teleprompter" element={<TeleprompterInput settings={settings} />} />
           <Route path="/app/calendar" element={<CalendarGenerator settings={settings} />} />
@@ -128,4 +138,22 @@ const App: React.FC = () => {
   return (
     <Routes>
       <Route path="/" element={<Landing />} />
-      <Route path="/login"
+      <Route path="/login" element={<Login />} />
+      <Route path="/signup" element={<Signup />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
+
+      <Route
+        path="/app/*"
+        element={
+          <ProtectedRoute>
+            <AppShell />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+};
+
+export default App;
