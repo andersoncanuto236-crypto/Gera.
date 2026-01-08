@@ -4,7 +4,10 @@ import { UserSettings } from './types';
 import Landing from './src/pages/Landing';
 import Login from './src/pages/Login';
 import Signup from './src/pages/Signup';
+codex/implementar-autenticacao-com-supabase-144z0x
 import AuthCallback from './src/pages/AuthCallback';
+
+main
 import ProtectedRoute from './src/routes/ProtectedRoute';
 import { useAuth } from './src/contexts/AuthContext';
 import { supabaseConfigError } from './src/lib/supabaseClient';
@@ -187,7 +190,9 @@ const App: React.FC = () => {
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
+codex/implementar-autenticacao-com-supabase-144z0x
       <Route path="/auth/callback" element={<AuthCallback />} />
+main
       <Route
         path="/app/*"
         element={

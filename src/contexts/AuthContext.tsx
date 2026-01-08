@@ -20,7 +20,11 @@ interface AuthContextValue {
   userPlan: UserPlan;
   userRole: UserRole;
   signInWithPassword: (email: string, password: string) => Promise<void>;
+codex/implementar-autenticacao-com-supabase-144z0x
   signUp: (email: string, password: string, emailRedirectTo?: string) => Promise<void>;
+
+  signUp: (email: string, password: string) => Promise<void>;
+main
   signOut: () => Promise<void>;
 }
 
@@ -157,6 +161,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
+codex/implementar-autenticacao-com-supabase-144z0x
   const signUp = useCallback(async (email: string, password: string, emailRedirectTo?: string) => {
     if (!supabase) {
       throw new Error(supabaseConfigError ?? 'Supabase não configurado.');
@@ -166,6 +171,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       password,
       options: emailRedirectTo ? { emailRedirectTo } : undefined
     });
+
+  const signUp = useCallback(async (email: string, password: string) => {
+    if (!supabase) {
+      throw new Error(supabaseConfigError ?? 'Supabase não configurado.');
+    }
+    const { error } = await supabase.auth.signUp({ email, password });
+ main
     if (error) {
       throw new Error(error.message);
     }

@@ -18,8 +18,12 @@ const Signup: React.FC = () => {
     setMessage('');
 
     try {
+codex/implementar-autenticacao-com-supabase-144z0x
       const emailRedirectTo = `${window.location.origin}/auth/callback`;
       await signUp(email, password, emailRedirectTo);
+
+      await signUp(email, password);
+main
       setMessage('Conta criada! Verifique seu email se precisar confirmar.');
       navigate('/app');
     } catch (err) {

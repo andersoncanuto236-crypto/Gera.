@@ -12,7 +12,11 @@ export const supabase = supabaseConfigError
   : createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
         persistSession: true,
+codex/implementar-autenticacao-com-supabase-144z0x
         autoRefreshToken: true,
         detectSessionInUrl: true
+=======
+        autoRefreshToken: true
+main
       }
     });
