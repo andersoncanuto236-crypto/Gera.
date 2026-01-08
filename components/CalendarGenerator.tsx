@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { UserSettings, CalendarDay } from '../types';
+import { canUseAI } from '../src/lib/plan';
 import { generateCalendar } from '../services/geminiService';
 import { SecureStorage, getSessionKey } from '../services/security';
 import PaywallModal from './PaywallModal';
@@ -9,7 +10,7 @@ import ConnectAIModal from './ConnectAIModal';
 interface CalendarGeneratorProps {
   settings: UserSettings;
   onAction?: () => void;
-  onUpdatePlan: (plan: 'PAID') => void;
+  onUpdatePlan: (plan?: 'PAID') => void;
 }
 
 const CalendarGenerator: React.FC<CalendarGeneratorProps> = ({ settings, onAction, onUpdatePlan }) => {
@@ -49,7 +50,7 @@ const CalendarGenerator: React.FC<CalendarGeneratorProps> = ({ settings, onActio
   };
 
   const handleGenerate = async () => {
-    if (settings.plan === 'FREE') {
+    if (!canUseAI(settings.plan)) {
       setShowPaywall(true);
       return;
     }
@@ -125,7 +126,7 @@ const CalendarGenerator: React.FC<CalendarGeneratorProps> = ({ settings, onActio
         <div className="flex flex-col md:flex-row gap-5">
           <input value={plan} onChange={(e) => setPlan(e.target.value)} placeholder="Foco da semana? (Ex: Autoridade, Vendas...)" className={inputClasses} />
           <button onClick={handleGenerate} disabled={loading} className="bg-brand-600 text-white px-12 py-5 rounded-3xl font-black shadow-2xl shadow-brand-500/30 hover:bg-brand-700 transition flex items-center justify-center gap-3 relative overflow-hidden group">
-            {settings.plan === 'FREE' && <div className="absolute inset-0 bg-black/40 flex items-center justify-center"><i className="fas fa-lock"></i></div>}
+            {!canUseAI(settings.plan) && <div className="absolute inset-0 bg-black/40 flex items-center justify-center"><i className="fas fa-lock"></i></div>}
             {loading ? <i className="fas fa-circle-notch fa-spin"></i> : <><i className="fas fa-magic"></i> Gerar Semana</>}
           </button>
         </div>
