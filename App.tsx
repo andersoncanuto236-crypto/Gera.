@@ -126,7 +126,7 @@ const AppShell: React.FC = () => {
               <Generator
                 settings={settings}
                 onOpenTeleprompter={(text) => setTeleprompterText(text)}
-                onUpdatePlan={() => handleUpgrade()}
+                onUpdatePlan={handleUpgrade}
               />
             }
           />
@@ -136,13 +136,13 @@ const AppShell: React.FC = () => {
               <TeleprompterInput
                 settings={settings}
                 onStart={(text) => setTeleprompterText(text)}
-                onUpdatePlan={() => handleUpgrade()}
+                onUpdatePlan={handleUpgrade}
               />
             }
           />
           <Route
             path="/app/calendar"
-            element={<CalendarGenerator settings={settings} onUpdatePlan={() => handleUpgrade()} />}
+            element={<CalendarGenerator settings={settings} onUpdatePlan={handleUpgrade} />}
           />
           <Route path="/app/history" element={<History />} />
           <Route
@@ -150,8 +150,8 @@ const AppShell: React.FC = () => {
             element={
               <Pricing
                 currentPlan={userPlan}
-                onUpgrade={() => handleUpgrade()}
-                onDowngrade={() => handleUpgrade()}
+                onUpgrade={handleUpgrade}
+                onDowngrade={handleUpgrade}
               />
             }
           />

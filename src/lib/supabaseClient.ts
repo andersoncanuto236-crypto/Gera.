@@ -13,6 +13,6 @@ export const supabase = supabaseConfigError
       auth: {
         persistSession: true,
         autoRefreshToken: true,
-        detectSessionInUrl: true
+        detectSessionInUrl: true,
       }
     });

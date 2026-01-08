@@ -18,7 +18,7 @@ const Signup: React.FC = () => {
     setMessage('');
 
     try {
-      const emailRedirectTo = `${window.location.origin}/auth/callback`;
+      const emailRedirectTo = new URL('/auth/callback', window.location.origin).toString();
       await signUp(email, password, emailRedirectTo);
       setMessage('Conta criada! Verifique seu email se precisar confirmar.');
       navigate('/app');
