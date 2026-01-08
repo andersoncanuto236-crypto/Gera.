@@ -1,3 +1,4 @@
+codex/implementar-autenticacao-com-supabase-1ws49x
 import React, {
   createContext,
   useCallback,
@@ -10,6 +11,12 @@ import type { Session, User } from '@supabase/supabase-js';
 import { supabase, supabaseConfigError } from '../lib/supabaseClient';
 import type { UserPlan } from '../../types';
 
+
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import type { Session, User } from '@supabase/supabase-js';
+import { supabase, supabaseConfigError } from '../lib/supabaseClient';
+import type { UserPlan } from '../../types';
+main
 export type UserRole = 'USER' | 'ADMIN';
 
 export interface UserProfile {
@@ -28,7 +35,11 @@ interface AuthContextValue {
   userPlan: UserPlan;
   userRole: UserRole;
   signInWithPassword: (email: string, password: string) => Promise<void>;
+codex/implementar-autenticacao-com-supabase-1ws49x
   signUp: (email: string, password: string, emailRedirectTo?: string) => Promise<void>;
+
+  signUp: (email: string, password: string) => Promise<void>;
+main
   signOut: () => Promise<void>;
 }
 
@@ -165,6 +176,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
+codex/implementar-autenticacao-com-supabase-1ws49x
   const signUp = useCallback(
     async (email: string, password: string, emailRedirectTo?: string) => {
       if (!supabase) {
@@ -182,6 +194,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     []
   );
 
+  const signUp = useCallback(async (email: string, password: string) => {
+    if (!supabase) {
+      throw new Error(supabaseConfigError ?? 'Supabase não configurado.');
+    }
+    const { error } = await supabase.auth.signUp({ email, password });
+    if (error) {
+      throw new Error(error.message);
+    }
+  }, []);
+main
+
   const signOut = useCallback(async () => {
     if (!supabase) {
       throw new Error(supabaseConfigError ?? 'Supabase não configurado.');
@@ -192,6 +215,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
+codex/implementar-autenticacao-com-supabase-1ws49x
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -206,6 +230,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }),
     [loading, profile, session, signInWithPassword, signOut, signUp, user]
   );
+
+  const value = useMemo<AuthContextValue>(() => ({
+    user,
+    session,
+    profile,
+    loading,
+    userPlan: profile?.plan ?? 'FREE',
+    userRole: profile?.role ?? 'USER',
+    signInWithPassword,
+    signUp,
+    signOut
+  }), [loading, profile, session, signInWithPassword, signOut, signUp, user]);
+main
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

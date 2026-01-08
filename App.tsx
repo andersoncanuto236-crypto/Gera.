@@ -4,7 +4,10 @@ import { UserSettings } from './types';
 import Landing from './src/pages/Landing';
 import Login from './src/pages/Login';
 import Signup from './src/pages/Signup';
+codex/implementar-autenticacao-com-supabase-1ws49x
 import AuthCallback from './src/pages/AuthCallback';
+=======
+main
 import ProtectedRoute from './src/routes/ProtectedRoute';
 import { useAuth } from './src/contexts/AuthContext';
 import { supabaseConfigError } from './src/lib/supabaseClient';
@@ -126,7 +129,11 @@ const AppShell: React.FC = () => {
               <Generator
                 settings={settings}
                 onOpenTeleprompter={(text) => setTeleprompterText(text)}
+codex/implementar-autenticacao-com-supabase-1ws49x
                 onUpdatePlan={handleUpgrade}
+
+                onUpdatePlan={() => handleUpgrade()}
+main
               />
             }
           />
@@ -136,13 +143,21 @@ const AppShell: React.FC = () => {
               <TeleprompterInput
                 settings={settings}
                 onStart={(text) => setTeleprompterText(text)}
+codex/implementar-autenticacao-com-supabase-1ws49x
                 onUpdatePlan={handleUpgrade}
+
+                onUpdatePlan={() => handleUpgrade()}
+main
               />
             }
           />
           <Route
             path="/app/calendar"
+codex/implementar-autenticacao-com-supabase-1ws49x
             element={<CalendarGenerator settings={settings} onUpdatePlan={handleUpgrade} />}
+
+            element={<CalendarGenerator settings={settings} onUpdatePlan={() => handleUpgrade()} />}
+main
           />
           <Route path="/app/history" element={<History />} />
           <Route
@@ -150,8 +165,13 @@ const AppShell: React.FC = () => {
             element={
               <Pricing
                 currentPlan={userPlan}
+codex/implementar-autenticacao-com-supabase-1ws49x
                 onUpgrade={handleUpgrade}
                 onDowngrade={handleUpgrade}
+
+                onUpgrade={() => handleUpgrade()}
+                onDowngrade={() => handleUpgrade()}
+ main
               />
             }
           />
@@ -187,7 +207,10 @@ const App: React.FC = () => {
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
+codex/implementar-autenticacao-com-supabase-1ws49x
       <Route path="/auth/callback" element={<AuthCallback />} />
+
+main
       <Route
         path="/app/*"
         element={
