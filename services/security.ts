@@ -1,10 +1,19 @@
 
 /**
- * SECURITY LAYER (Simulated Backend Security)
+ * SECURITY LAYER
  * Responsável por proteger credenciais e integridade de dados locais.
  */
 
-const FALLBACK_KEY = "AIzaSyAKLApGRMcFFKIBZ9Fbtp333ZW_4Qm8Xfo";
+// Memória Volátil para API Key (BYOK) - Reseta ao recarregar a página
+let sessionApiKey: string | null = null;
+
+export const setSessionKey = (key: string) => {
+  sessionApiKey = key;
+};
+
+export const getSessionKey = (): string | null => {
+  return sessionApiKey;
+};
 
 /**
  * Sanitiza strings para evitar injeção de scripts e quebras de layout.
@@ -17,28 +26,12 @@ export const sanitize = (str: string): string => {
 };
 
 /**
- * Recupera as credenciais de forma opaca.
- * Prioriza variáveis de ambiente. Se ausentes, utiliza a chave de fallback configurada.
- */
-export const getInternalCredentials = (): string => {
-  // Prioriza a chave injetada pelo ambiente (process.env.API_KEY).
-  // Caso não exista, utiliza a chave fornecida pelo usuário.
-  return process.env.API_KEY || FALLBACK_KEY;
-};
-
-/**
  * Gerenciamento seguro de armazenamento local.
- * Implementa verificação de integridade compatível com caracteres UTF-8 (acentuação).
  */
 export const SecureStorage = {
   setItem: (key: string, value: any) => {
     try {
       const json = JSON.stringify(value);
-      
-      /**
-       * CORREÇÃO: btoa nativo só aceita Latin1.
-       * Para suportar Português (acentos) e Emojis, convertemos para bytes UTF-8 primeiro.
-       */
       const encoder = new TextEncoder();
       const bytes = encoder.encode(json);
       let binary = '';
@@ -46,14 +39,13 @@ export const SecureStorage = {
       for (let i = 0; i < len; i++) {
         binary += String.fromCharCode(bytes[i]);
       }
-      
       const checksum = btoa(binary).slice(0, 10);
 
       const data = {
         payload: value,
         checksum: checksum,
         ts: Date.now(),
-        v: "2.1" // Versão do schema de segurança
+        v: "2.1"
       };
       
       localStorage.setItem(`_gs_v2_${key}`, JSON.stringify(data));
@@ -68,12 +60,9 @@ export const SecureStorage = {
       if (!raw) return null;
       
       const parsed = JSON.parse(raw);
-      
-      // Validação básica de estrutura v2
       if (parsed && typeof parsed === 'object' && 'payload' in parsed) {
         return parsed.payload;
       }
-      
       return parsed;
     } catch (e) {
       console.warn("Falha ao recuperar item do storage:", key);

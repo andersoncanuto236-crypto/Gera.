@@ -1,28 +1,56 @@
 
 import React, { useState } from 'react';
 import { UserSettings, GeneratedContent } from '../types';
-import { generatePostV1 } from '../services/geminiService';
-import { SecureStorage } from '../services/security';
+import { generatePostV1, generateScript } from '../services/geminiService';
+import { SecureStorage, getSessionKey } from '../services/security';
+import PaywallModal from './PaywallModal';
+import ConnectAIModal from './ConnectAIModal';
 
 interface GeneratorProps {
   settings: UserSettings;
   onOpenTeleprompter?: (text: string) => void;
+  onUpdatePlan: (plan: 'PAID') => void;
 }
 
-const Generator: React.FC<GeneratorProps> = ({ settings, onOpenTeleprompter }) => {
-  // Input States
+const Generator: React.FC<GeneratorProps> = ({ settings, onOpenTeleprompter, onUpdatePlan }) => {
+  // Mode State
+  const [mode, setMode] = useState<'MANUAL' | 'IA'>('MANUAL');
+  
+  // Paywall & Auth State
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [showKeyInput, setShowKeyInput] = useState(false);
+  
+  // Input States (Shared)
   const [objective, setObjective] = useState('');
   const [platform, setPlatform] = useState('Instagram');
   const [context, setContext] = useState('');
   
+  // Manual Inputs
+  const [manualHook, setManualHook] = useState('');
+  const [manualContent, setManualContent] = useState('');
+  const [manualCta, setManualCta] = useState('');
+
   // Processing States
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<GeneratedContent | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleGenerate = async () => {
-    if (!objective) return;
+  // Switch Mode Logic
+  const handleModeSwitch = (newMode: 'MANUAL' | 'IA') => {
+    if (newMode === 'IA' && settings.plan === 'FREE') {
+      setShowPaywall(true);
+      return;
+    }
+    setMode(newMode);
+  };
 
+  const handleUpgrade = () => {
+     onUpdatePlan('PAID');
+     setShowPaywall(false);
+     setMode('IA');
+  };
+
+  const executeGeneration = async () => {
     setLoading(true);
     setResult(null);
     setError(null);
@@ -31,7 +59,6 @@ const Generator: React.FC<GeneratorProps> = ({ settings, onOpenTeleprompter }) =
       const res = await generatePostV1(settings, objective, platform, context);
       setResult(res);
       
-      // Save to History
       const history = SecureStorage.getItem('history') || [];
       SecureStorage.setItem('history', [
         { id: Date.now().toString(), timestamp: Date.now(), content: res },
@@ -40,32 +67,111 @@ const Generator: React.FC<GeneratorProps> = ({ settings, onOpenTeleprompter }) =
 
     } catch (e: any) {
       console.error(e);
-      let msg = "Não foi possível gerar o conteúdo agora.";
-      setError(msg);
+      if (e.message === "MISSING_API_KEY") {
+         setShowKeyInput(true);
+      } else {
+         setError("Não foi possível gerar o conteúdo agora.");
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  const handleGenerate = async () => {
+    if (mode === 'MANUAL') {
+       // Manual "Generation" just packages the text
+       const manualRes: GeneratedContent = {
+         metaObjective: objective || 'Manual',
+         hook: manualHook,
+         content: manualContent,
+         cta: manualCta,
+         platform: platform,
+         type: 'Manual'
+       };
+       setResult(manualRes);
+       return;
+    }
+
+    // IA Mode Check
+    if (settings.plan === 'FREE') {
+       setShowPaywall(true);
+       return;
+    }
+
+    if (!getSessionKey()) {
+       setShowKeyInput(true);
+       return;
+    }
+
+    await executeGeneration();
+  };
+
+  const handleConvertToScript = async () => {
+     if (!result) return;
+     if (settings.plan === 'FREE') {
+        setShowPaywall(true);
+        return;
+     }
+     if (!getSessionKey()) {
+        setShowKeyInput(true);
+        return;
+     }
+
+     setLoading(true);
+     try {
+       const script = await generateScript(settings, result.content.substring(0, 100));
+       setResult({ ...result, content: script, metaObjective: 'Roteiro (IA)' });
+     } catch (e) {
+       console.error(e);
+     } finally {
+       setLoading(false);
+     }
+  };
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    alert("Conteúdo copiado!");
+    alert("Copiado!");
   };
 
   const objectives = [
-    { id: 'Venda', icon: 'fa-shopping-cart', label: 'Vender', desc: 'Oferta direta e conversão' },
-    { id: 'Autoridade', icon: 'fa-star', label: 'Posicionar', desc: 'Mostrar expertise e confiança' },
-    { id: 'Educar', icon: 'fa-book-open', label: 'Educar', desc: 'Ensinar algo ao público' },
-    { id: 'Engajamento', icon: 'fa-comments', label: 'Engajar', desc: 'Gerar comentários e likes' },
+    { id: 'Venda', icon: 'fa-shopping-cart', label: 'Vender', desc: 'Oferta direta' },
+    { id: 'Autoridade', icon: 'fa-star', label: 'Autoridade', desc: 'Expertise' },
+    { id: 'Educar', icon: 'fa-book-open', label: 'Educar', desc: 'Ensinar algo' },
+    { id: 'Engajamento', icon: 'fa-comments', label: 'Engajar', desc: 'Gerar conversa' },
   ];
 
   return (
-    <div className="max-w-3xl mx-auto space-y-10 animate-fade-in pb-24">
-      {/* Header */}
+    <div className="max-w-3xl mx-auto space-y-8 animate-fade-in pb-24">
+      <PaywallModal 
+        isOpen={showPaywall} 
+        onClose={() => setShowPaywall(false)} 
+        onUpgrade={handleUpgrade}
+        featureName="Gerador de Conteúdo"
+      />
+      
+      <ConnectAIModal
+        isOpen={showKeyInput}
+        onClose={() => setShowKeyInput(false)}
+        onConnected={() => { setShowKeyInput(false); executeGeneration(); }}
+      />
+
+      {/* Mode Switcher */}
       {!result && (
-        <div className="text-center">
-          <h2 className="text-3xl font-black text-white tracking-tighter uppercase">Criar Conteúdo</h2>
-          <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-2">Foco Estratégico & Tom de Voz</p>
+        <div className="flex justify-center mb-8">
+           <div className="bg-white/5 p-1 rounded-2xl flex border border-white/5">
+              <button 
+                onClick={() => handleModeSwitch('MANUAL')}
+                className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${mode === 'MANUAL' ? 'bg-white text-slate-900 shadow-lg' : 'text-slate-500 hover:text-white'}`}
+              >
+                Editor Manual
+              </button>
+              <button 
+                onClick={() => handleModeSwitch('IA')}
+                className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${mode === 'IA' ? 'bg-brand-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
+              >
+                <i className="fas fa-bolt"></i> IA Automática {settings.plan === 'FREE' && <i className="fas fa-lock text-[8px] opacity-50 ml-1"></i>}
+              </button>
+           </div>
         </div>
       )}
 
@@ -77,33 +183,10 @@ const Generator: React.FC<GeneratorProps> = ({ settings, onOpenTeleprompter }) =
             </div>
           )}
 
-          {/* Step 1: Objective */}
-          <div className="grid grid-cols-2 gap-4">
-            {objectives.map((obj) => (
-              <button
-                key={obj.id}
-                onClick={() => setObjective(obj.id)}
-                className={`p-6 rounded-[32px] border text-left transition-all duration-300 group ${
-                  objective === obj.id 
-                    ? 'bg-brand-600 border-brand-500 text-white shadow-xl scale-[1.02]' 
-                    : 'bg-white/5 border-white/5 text-slate-400 hover:bg-white/10 hover:border-white/20'
-                }`}
-              >
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg mb-3 ${
-                   objective === obj.id ? 'bg-white text-brand-600' : 'bg-black/20'
-                }`}>
-                  <i className={`fas ${obj.icon}`}></i>
-                </div>
-                <h3 className={`font-black uppercase text-xs mb-1 ${objective === obj.id ? 'text-white' : 'text-slate-300'}`}>{obj.label}</h3>
-                <p className={`text-[9px] font-medium leading-tight ${objective === obj.id ? 'text-brand-100' : 'text-slate-500'}`}>{obj.desc}</p>
-              </button>
-            ))}
-          </div>
-
-          {/* Step 2 & 3: Platform & Context */}
+          {/* Platform & Objective (Common) */}
           <div className="glass-panel p-6 rounded-[32px] space-y-6">
              <div className="flex gap-2 bg-black/20 p-1.5 rounded-2xl">
-               {['Instagram', 'LinkedIn', 'YouTube', 'TikTok'].map(p => (
+               {['Instagram', 'LinkedIn', 'TikTok'].map(p => (
                  <button 
                    key={p} 
                    onClick={() => setPlatform(p)}
@@ -115,22 +198,80 @@ const Generator: React.FC<GeneratorProps> = ({ settings, onOpenTeleprompter }) =
                  </button>
                ))}
              </div>
-
-             <textarea 
-               value={context}
-               onChange={e => setContext(e.target.value)}
-               placeholder="Contexto opcional (ex: Promoção de Black Friday, lançamento de curso...)"
-               className="w-full bg-slate-900/50 border border-white/5 rounded-2xl p-4 text-white placeholder-slate-600 text-sm outline-none focus:border-brand-500 transition h-24 resize-none"
-             />
-
-             <button 
-               onClick={handleGenerate}
-               disabled={loading || !objective}
-               className="w-full py-5 bg-brand-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-brand-500/20 disabled:opacity-50 hover:bg-brand-500 transition-all flex items-center justify-center gap-3 active:scale-95"
-             >
-               {loading ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-bolt"></i> Gerar Conteúdo Premium</>}
-             </button>
+             
+             {/* Objective Selection */}
+              <div className="grid grid-cols-4 gap-2">
+                {objectives.map((obj) => (
+                  <button
+                    key={obj.id}
+                    onClick={() => setObjective(obj.id)}
+                    className={`flex flex-col items-center justify-center p-4 rounded-2xl border transition-all duration-300 ${
+                      objective === obj.id 
+                        ? 'bg-brand-600 border-brand-500 text-white shadow-lg' 
+                        : 'bg-white/5 border-white/5 text-slate-400 hover:bg-white/10'
+                    }`}
+                  >
+                    <i className={`fas ${obj.icon} text-lg mb-2`}></i>
+                    <span className="text-[8px] font-black uppercase tracking-widest">{obj.label}</span>
+                  </button>
+                ))}
+              </div>
           </div>
+
+          {mode === 'MANUAL' ? (
+             /* Manual Editor */
+             <div className="glass-panel p-8 rounded-[32px] space-y-6 animate-fade-in">
+                <div>
+                   <label className="text-[9px] font-black uppercase text-brand-500 tracking-widest ml-1 mb-2 block">Hook (Gancho)</label>
+                   <input 
+                     value={manualHook}
+                     onChange={e => setManualHook(e.target.value)}
+                     className="w-full bg-slate-900/50 border border-white/10 rounded-xl p-4 text-white font-bold"
+                     placeholder="A frase inicial que prende atenção..."
+                   />
+                </div>
+                <div>
+                   <label className="text-[9px] font-black uppercase text-brand-500 tracking-widest ml-1 mb-2 block">Desenvolvimento</label>
+                   <textarea 
+                     value={manualContent}
+                     onChange={e => setManualContent(e.target.value)}
+                     className="w-full h-40 bg-slate-900/50 border border-white/10 rounded-xl p-4 text-white resize-none"
+                     placeholder="O corpo do seu conteúdo..."
+                   />
+                </div>
+                <div>
+                   <label className="text-[9px] font-black uppercase text-brand-500 tracking-widest ml-1 mb-2 block">CTA (Chamada)</label>
+                   <input 
+                     value={manualCta}
+                     onChange={e => setManualCta(e.target.value)}
+                     className="w-full bg-slate-900/50 border border-white/10 rounded-xl p-4 text-white font-bold"
+                     placeholder="O que o usuário deve fazer?"
+                   />
+                </div>
+             </div>
+          ) : (
+             /* IA Inputs */
+             <div className="glass-panel p-6 rounded-[32px] space-y-4 animate-fade-in">
+               <textarea 
+                 value={context}
+                 onChange={e => setContext(e.target.value)}
+                 placeholder="Contexto extra para a IA (opcional)..."
+                 className="w-full bg-slate-900/50 border border-white/5 rounded-2xl p-4 text-white placeholder-slate-600 text-sm outline-none focus:border-brand-500 transition h-24 resize-none"
+               />
+             </div>
+          )}
+
+          <button 
+             onClick={handleGenerate}
+             disabled={loading || !objective}
+             className={`w-full py-6 rounded-2xl font-black uppercase tracking-widest shadow-xl transition-all flex items-center justify-center gap-3 active:scale-95 ${
+               mode === 'IA' ? 'bg-brand-600 text-white hover:bg-brand-500 shadow-brand-500/20' : 'bg-white text-slate-900 hover:bg-slate-200'
+             }`}
+           >
+             {loading ? <i className="fas fa-spinner fa-spin"></i> : (
+               mode === 'IA' ? <><i className="fas fa-bolt"></i> Gerar com IA</> : <><i className="fas fa-save"></i> Organizar Rascunho</>
+             )}
+           </button>
         </div>
       ) : (
         // Result View
@@ -142,13 +283,15 @@ const Generator: React.FC<GeneratorProps> = ({ settings, onOpenTeleprompter }) =
              </div>
 
              <div className="space-y-6 text-slate-900">
-               <div>
-                 <p className="text-[10px] font-black uppercase text-brand-600 tracking-widest mb-1">Estratégia sugerida</p>
-                 <p className="text-sm font-medium text-slate-500 leading-snug">{result.metaObjective}</p>
-               </div>
+               {result.hook && (
+                <div>
+                  <p className="text-[10px] font-black uppercase text-brand-600 tracking-widest mb-1">Gancho (Hook)</p>
+                  <p className="text-lg font-black text-slate-800 leading-tight">{result.hook}</p>
+                </div>
+               )}
 
                <div>
-                  <p className="text-[10px] font-black uppercase text-brand-600 tracking-widest mb-2">Conteúdo Final</p>
+                  <p className="text-[10px] font-black uppercase text-brand-600 tracking-widest mb-2">Conteúdo</p>
                   <div className="bg-gray-50 p-6 rounded-3xl border border-gray-100 whitespace-pre-line font-medium text-base leading-relaxed text-gray-800">
                     {result.content}
                   </div>
@@ -158,7 +301,7 @@ const Generator: React.FC<GeneratorProps> = ({ settings, onOpenTeleprompter }) =
                  <div className="bg-brand-50 p-4 rounded-2xl flex items-center gap-4 border border-brand-100">
                    <div className="w-8 h-8 rounded-full bg-brand-200 flex items-center justify-center text-brand-700 text-xs shadow-sm"><i className="fas fa-bullhorn"></i></div>
                    <div>
-                      <p className="text-[9px] font-black uppercase text-brand-700 tracking-widest">Chamada para Ação</p>
+                      <p className="text-[9px] font-black uppercase text-brand-700 tracking-widest">CTA</p>
                       <p className="text-sm font-bold text-brand-900">{result.cta}</p>
                    </div>
                  </div>
@@ -166,8 +309,8 @@ const Generator: React.FC<GeneratorProps> = ({ settings, onOpenTeleprompter }) =
              </div>
 
              <div className="pt-8 flex flex-col sm:flex-row gap-4">
-               <button onClick={() => copyToClipboard(result.content)} className="flex-1 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition shadow-xl active:scale-95">
-                 <i className="far fa-copy mr-2"></i> Copiar Texto
+               <button onClick={() => copyToClipboard(`${result.hook}\n\n${result.content}\n\n${result.cta}`)} className="flex-1 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition shadow-xl active:scale-95">
+                 <i className="far fa-copy mr-2"></i> Copiar
                </button>
                
                {onOpenTeleprompter && (
@@ -175,20 +318,16 @@ const Generator: React.FC<GeneratorProps> = ({ settings, onOpenTeleprompter }) =
                   onClick={() => onOpenTeleprompter(result.content)} 
                   className="flex-1 py-4 bg-brand-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-brand-500 transition shadow-xl active:scale-95 flex items-center justify-center gap-2"
                 >
-                  <i className="fas fa-video"></i> Grave com Teleprompter
+                  <i className="fas fa-video"></i> Teleprompter
                 </button>
                )}
                
-               <button onClick={() => setResult(null)} className="px-6 py-4 bg-gray-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-200 transition active:scale-95">
-                 Recriar
+               {/* "Melhorar com IA" só aparece no modo manual ou se o usuario quiser refinar. Botão protegido */}
+               <button onClick={handleConvertToScript} disabled={loading} className="px-6 py-4 bg-gray-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-200 transition active:scale-95 group relative">
+                 {loading ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-magic text-brand-500"></i>}
+                 {settings.plan === 'FREE' && <div className="absolute -top-1 -right-1 bg-black text-white text-[8px] p-1 rounded-full"><i className="fas fa-lock"></i></div>}
                </button>
              </div>
-          </div>
-          
-          <div className="bg-white/5 p-6 rounded-3xl border border-white/5 text-center">
-             <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest italic leading-relaxed">
-               Dica: O teleprompter ajuda a manter o contato visual com a câmera enquanto você lê seu roteiro perfeito.
-             </p>
           </div>
         </div>
       )}

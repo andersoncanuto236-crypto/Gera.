@@ -1,19 +1,22 @@
 
+export type UserPlan = 'FREE' | 'PAID';
+
 export interface UserSettings {
   businessName: string;
   niche: string; // Tipo de negócio
   audience: string;
   tone: string;
   avatar?: string;
+  plan: UserPlan; // Novo campo obrigatório
 }
 
 export interface GeneratedContent {
-  metaObjective: string; // 1. Content Objective
-  idea: string;          // 2. Content Idea
-  content: string;       // 3. Final Content (Ready to post)
-  cta?: string;          // 4. Optional CTA
+  metaObjective: string; 
+  hook: string;          
+  content: string;       
+  cta?: string;          
   platform: string;
-  type: string;          // Objetivo selecionado (Venda, Autoridade...)
+  type: string;          
 }
 
 export interface HistoryItem {
@@ -22,15 +25,14 @@ export interface HistoryItem {
   content: GeneratedContent;
 }
 
-// Navegação completa incluindo Landing Page
-export type ViewState = 'landing' | 'login' | 'dashboard' | 'create' | 'history' | 'management' | 'calendar';
+export type ViewState = 'landing' | 'login' | 'dashboard' | 'create' | 'history' | 'calendar' | 'teleprompter' | 'plans';
 
 export interface CalendarDay {
   id: string;
   date?: string;
   day: string;
   topic: string;
-  type: 'POST' | 'REELS' | 'STORY';
+  format: string;
   brief: string;
   status: 'pending' | 'done';
   resultNotes?: string;

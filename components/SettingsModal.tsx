@@ -1,16 +1,16 @@
 
 import React, { useState } from 'react';
-import { UserSettings } from '../types';
+import { UserSettings, UserPlan } from '../types';
 
 interface SettingsModalProps {
   settings: UserSettings;
   onSave: (s: UserSettings) => void;
   isOpen: boolean;
-  // onClose removido pois no fluxo V1 a configuração é obrigatória se não existir
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ settings, onSave, isOpen }) => {
-  const [formData, setFormData] = useState<UserSettings>(settings);
+  // Inicializa o plano como FREE se não estiver definido
+  const [formData, setFormData] = useState<UserSettings>({ ...settings, plan: settings.plan || 'FREE' });
   const [error, setError] = useState('');
 
   if (!isOpen) return null;
@@ -27,8 +27,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ settings, onSave, isOpen 
   const labelClasses = "block text-[10px] font-black text-brand-500 uppercase tracking-widest mb-2 ml-1";
 
   return (
-    <div className="fixed inset-0 bg-[#0D171D]/95 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
-      <div className="max-w-lg w-full">
+    <div className="fixed inset-0 bg-[#0D171D]/95 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in overflow-y-auto">
+      <div className="max-w-lg w-full my-10">
         <div className="text-center mb-10">
            <h2 className="text-3xl font-black text-white tracking-tighter mb-2">Novo Projeto</h2>
            <p className="text-slate-400 text-sm">Defina o contexto para a IA trabalhar por você.</p>
@@ -84,6 +84,25 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ settings, onSave, isOpen 
                 <option value="Educativo e Inspirador">Educativo e Inspirador</option>
                 <option value="Sofisticado e Exclusivo">Sofisticado e Exclusivo</option>
              </select>
+          </div>
+          
+          {/* Seletor de Plano Simulado para Onboarding */}
+          <div className="pt-2 pb-2">
+             <label className={labelClasses}>Plano Inicial</label>
+             <div className="grid grid-cols-2 gap-4">
+               <button 
+                 onClick={() => setFormData({...formData, plan: 'FREE'})}
+                 className={`p-4 rounded-xl border flex flex-col items-center gap-2 ${formData.plan === 'FREE' ? 'bg-white text-slate-900 border-white' : 'bg-white/5 border-white/5 text-slate-500'}`}
+               >
+                 <span className="font-black uppercase text-xs">Free (Manual)</span>
+               </button>
+               <button 
+                 onClick={() => setFormData({...formData, plan: 'PAID'})}
+                 className={`p-4 rounded-xl border flex flex-col items-center gap-2 ${formData.plan === 'PAID' ? 'bg-brand-600 text-white border-brand-500' : 'bg-white/5 border-white/5 text-slate-500'}`}
+               >
+                 <span className="font-black uppercase text-xs">Starter (IA)</span>
+               </button>
+             </div>
           </div>
 
           <div className="pt-4">
