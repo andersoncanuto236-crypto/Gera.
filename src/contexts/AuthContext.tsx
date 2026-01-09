@@ -81,6 +81,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [userPlan, setUserPlan] = useState<UserPlan>('FREE');
   const [userRole, setUserRole] = useState<UserRole>('USER');
 
+  const getSessionWithTimeout = useCallback(async () => {
+    const timeoutMs = 8000;
+
+    return Promise.race([
+      supabase.auth.getSession(),
+      new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error('getSession timeout'));
+        }, timeoutMs);
+      }),
+    ]);
+  }, []);
+
   const updateProfile = useCallback((updates: Partial<Profile>) => {
     setProfile((current) => (current ? { ...current, ...updates } : current));
   }, []);
@@ -111,23 +124,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async function init() {
       setLoading(true);
 
-      const { data } = await supabase.auth.getSession();
-      if (!mounted) return;
-
-      const s = data.session ?? null;
-      setSession(s);
-      setUser(s?.user ?? null);
-
-      if (s?.user) {
-        await refreshProfile(s.user.id);
+      try {
+        const { data } = await getSessionWithTimeout();
         if (!mounted) return;
-      } else {
+
+        const s = data.session ?? null;
+        setSession(s);
+        setUser(s?.user ?? null);
+
+        if (s?.user) {
+          await refreshProfile(s.user.id);
+          if (!mounted) return;
+        } else {
+          setProfile(null);
+          setUserPlan('FREE');
+          setUserRole('USER');
+        }
+      } catch (error) {
+        console.error('Auth init error:', (error as Error).message);
+        setSession(null);
+        setUser(null);
         setProfile(null);
         setUserPlan('FREE');
         setUserRole('USER');
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
       }
-
-      setLoading(false);
     }
 
     init();
@@ -146,6 +170,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUserPlan('FREE');
         setUserRole('USER');
       }
+
+      setLoading(false);
     });
 
     return () => {
