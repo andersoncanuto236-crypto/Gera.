@@ -1,4 +1,11 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabaseClient';
 
@@ -24,8 +31,13 @@ type AuthContextValue = {
   profile: Profile | null;
   userPlan: UserPlan;
   userRole: UserRole;
+
+  // Atualiza apenas o state local (não grava no banco)
   updateProfile: (updates: Partial<Profile>) => void;
+
+  // Re-busca o profile do Supabase e atualiza o state local
   refreshProfile: (userId?: string) => Promise<Profile | null>;
+
   signInWithPassword: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, emailRedirectTo?: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -68,12 +80,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [userPlan, setUserPlan] = useState<UserPlan>('FREE');
   const [userRole, setUserRole] = useState<UserRole>('USER');
+
   const updateProfile = useCallback((updates: Partial<Profile>) => {
     setProfile((current) => (current ? { ...current, ...updates } : current));
   }, []);
+
   const refreshProfile = useCallback(
     async (userId?: string) => {
       const targetId = userId ?? user?.id;
+
       if (!targetId) {
         setProfile(null);
         setUserPlan('FREE');
