@@ -8,10 +8,14 @@ export const supabaseConfigError =
     ? 'Variáveis do Supabase não configuradas (VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY).'
     : null;
 
-export const supabase = createClient(supabaseUrl ?? '', supabaseAnonKey ?? '', {
-  auth: {
-    detectSessionInUrl: true,
-    persistSession: true,
-    autoRefreshToken: true,
-  },
-});
+export const supabase = (() => {
+  if (!supabaseUrl || !supabaseAnonKey) return null;
+
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      detectSessionInUrl: true,
+      persistSession: true,
+      autoRefreshToken: true,
+    },
+  });
+})();
