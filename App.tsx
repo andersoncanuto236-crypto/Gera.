@@ -9,7 +9,7 @@ import AuthCallback from './src/pages/AuthCallback';
 
 import ProtectedRoute from './src/routes/ProtectedRoute';
 import { useAuth } from './src/contexts/AuthContext';
-import { supabaseConfigError } from './src/lib/supabaseClient';
+import { supabase, supabaseConfigError } from './src/lib/supabaseClient';
 
 import SettingsModal from './components/SettingsModal';
 import Dashboard from './components/Dashboard';
@@ -24,22 +24,60 @@ import { SecureStorage } from './services/security';
 
 const AppShell: React.FC = () => {
   const navigate = useNavigate();
-  const { userPlan, profile, signOut } = useAuth();
+  const { userPlan, profile, signOut, user, loading, refreshProfile } = useAuth();
 
   const [teleprompterText, setTeleprompterText] = useState<string | null>(null);
+  const defaultSettings: UserSettings = {
+    businessName: '',
+    niche: '',
+    audience: '',
+    tone: '',
+    plan: 'FREE',
+  };
   const [settings, setSettings] = useState<UserSettings>(() => {
     const saved = SecureStorage.getItem('settings');
-    return saved || { businessName: '', niche: '', audience: '', tone: '', plan: 'FREE' };
+    return saved || defaultSettings;
   });
+
+  useEffect(() => {
+    if (profile) {
+      setSettings((current) => ({
+        ...current,
+        businessName: profile.business_name ?? '',
+        niche: profile.niche ?? '',
+        audience: profile.audience ?? '',
+        tone: profile.tone ?? '',
+      }));
+    }
+  }, [profile]);
 
   useEffect(() => {
     setSettings((current) => ({ ...current, plan: userPlan }));
   }, [userPlan]);
 
-  const handleSaveSettings = (newSettings: UserSettings) => {
+  const handleSaveSettings = async (newSettings: UserSettings) => {
+    if (!user) {
+      throw new Error('Usuário não autenticado.');
+    }
+
+    const payload = {
+      business_name: newSettings.businessName,
+      niche: newSettings.niche,
+      audience: newSettings.audience,
+      tone: newSettings.tone,
+    };
+
+    const { error } = await supabase
+      .from('profiles')
+      .upsert({ id: user.id, ...payload }, { onConflict: 'id' });
+    if (error) {
+      throw error;
+    }
+
     const updated = { ...newSettings, plan: userPlan } as UserSettings;
     setSettings(updated);
     SecureStorage.setItem('settings', updated);
+    await refreshProfile(user.id);
   };
 
   const handleLogout = async () => {
@@ -51,7 +89,8 @@ const AppShell: React.FC = () => {
     navigate('/app/plans');
   };
 
-  const needsOnboarding = !settings.businessName;
+  const needsOnboarding =
+    !loading && (!profile?.business_name || profile.business_name.trim() === '');
 
   const navItems = [
     { id: 'dashboard', icon: 'fa-home', label: 'Início', to: '/app', end: true },

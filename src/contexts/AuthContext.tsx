@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabaseClient';
 
@@ -9,6 +9,10 @@ type Profile = {
   id: string;
   email: string | null;
   name: string | null;
+  business_name: string | null;
+  niche: string | null;
+  audience: string | null;
+  tone: string | null;
   plan: UserPlan;
   role: UserRole;
 };
@@ -20,6 +24,8 @@ type AuthContextValue = {
   profile: Profile | null;
   userPlan: UserPlan;
   userRole: UserRole;
+  updateProfile: (updates: Partial<Profile>) => void;
+  refreshProfile: (userId?: string) => Promise<Profile | null>;
   signInWithPassword: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, emailRedirectTo?: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -30,7 +36,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 async function fetchProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id,email,name,plan,role')
+    .select('id,email,name,plan,role,business_name,niche,audience,tone')
     .eq('id', userId)
     .maybeSingle();
 
@@ -45,6 +51,10 @@ async function fetchProfile(userId: string): Promise<Profile | null> {
     id: data.id,
     email: data.email ?? null,
     name: (data as any).name ?? null,
+    business_name: (data as any).business_name ?? null,
+    niche: (data as any).niche ?? null,
+    audience: (data as any).audience ?? null,
+    tone: (data as any).tone ?? null,
     plan: (data.plan as UserPlan) ?? 'FREE',
     role: (data.role as UserRole) ?? 'USER',
   };
@@ -58,6 +68,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [userPlan, setUserPlan] = useState<UserPlan>('FREE');
   const [userRole, setUserRole] = useState<UserRole>('USER');
+  const updateProfile = useCallback((updates: Partial<Profile>) => {
+    setProfile((current) => (current ? { ...current, ...updates } : current));
+  }, []);
+  const refreshProfile = useCallback(
+    async (userId?: string) => {
+      const targetId = userId ?? user?.id;
+      if (!targetId) {
+        setProfile(null);
+        setUserPlan('FREE');
+        setUserRole('USER');
+        return null;
+      }
+
+      const p = await fetchProfile(targetId);
+      setProfile(p);
+      setUserPlan(p?.plan ?? 'FREE');
+      setUserRole(p?.role ?? 'USER');
+      return p;
+    },
+    [user]
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -73,12 +104,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(s?.user ?? null);
 
       if (s?.user) {
-        const p = await fetchProfile(s.user.id);
+        await refreshProfile(s.user.id);
         if (!mounted) return;
-
-        setProfile(p);
-        setUserPlan(p?.plan ?? 'FREE');
-        setUserRole(p?.role ?? 'USER');
       } else {
         setProfile(null);
         setUserPlan('FREE');
@@ -97,12 +124,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(newSession?.user ?? null);
 
       if (newSession?.user) {
-        const p = await fetchProfile(newSession.user.id);
+        await refreshProfile(newSession.user.id);
         if (!mounted) return;
-
-        setProfile(p);
-        setUserPlan(p?.plan ?? 'FREE');
-        setUserRole(p?.role ?? 'USER');
       } else {
         setProfile(null);
         setUserPlan('FREE');
@@ -114,7 +137,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       mounted = false;
       sub.subscription.unsubscribe();
     };
-  }, []);
+  }, [refreshProfile]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -124,6 +147,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       profile,
       userPlan,
       userRole,
+      updateProfile,
+      refreshProfile,
       signInWithPassword: async (email, password) => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -141,7 +166,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (error) throw error;
       },
     }),
-    [user, session, loading, profile, userPlan, userRole]
+    [user, session, loading, profile, userPlan, userRole, updateProfile, refreshProfile]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
