@@ -24,9 +24,10 @@ import { SecureStorage } from './services/security';
 
 const AppShell: React.FC = () => {
   const navigate = useNavigate();
-  const { userPlan, profile, signOut, user, loading, updateProfile } = useAuth();
+  const { userPlan, profile, signOut, user, loading, refreshProfile } = useAuth();
 
   const [teleprompterText, setTeleprompterText] = useState<string | null>(null);
+
   const defaultSettings: UserSettings = {
     businessName: '',
     niche: '',
@@ -34,23 +35,26 @@ const AppShell: React.FC = () => {
     tone: '',
     plan: 'FREE',
   };
+
   const [settings, setSettings] = useState<UserSettings>(() => {
     const saved = SecureStorage.getItem('settings');
     return saved || defaultSettings;
   });
 
+  // Sempre que o profile do Supabase chegar/atualizar, sincroniza no state do app
   useEffect(() => {
     if (profile) {
       setSettings((current) => ({
         ...current,
-        businessName: profile.business_name ?? '',
-        niche: profile.niche ?? '',
-        audience: profile.audience ?? '',
-        tone: profile.tone ?? '',
+        businessName: (profile as any).business_name ?? '',
+        niche: (profile as any).niche ?? '',
+        audience: (profile as any).audience ?? '',
+        tone: (profile as any).tone ?? '',
       }));
     }
   }, [profile]);
 
+  // Sempre sincroniza o plano no state local
   useEffect(() => {
     setSettings((current) => ({ ...current, plan: userPlan }));
   }, [userPlan]);
@@ -67,7 +71,11 @@ const AppShell: React.FC = () => {
       tone: newSettings.tone,
     };
 
-    const { error } = await supabase.from('profiles').update(payload).eq('id', user.id);
+    // UPSERT garante que o perfil exista
+    const { error } = await supabase
+      .from('profiles')
+      .upsert({ id: user.id, ...payload }, { onConflict: 'id' });
+
     if (error) {
       throw error;
     }
@@ -75,7 +83,9 @@ const AppShell: React.FC = () => {
     const updated = { ...newSettings, plan: userPlan } as UserSettings;
     setSettings(updated);
     SecureStorage.setItem('settings', updated);
-    updateProfile(payload);
+
+    // Atualiza o profile no AuthContext para fechar o onboarding corretamente
+    await refreshProfile(user.id);
   };
 
   const handleLogout = async () => {
@@ -87,8 +97,9 @@ const AppShell: React.FC = () => {
     navigate('/app/plans');
   };
 
+  // Onboarding só se não tiver business_name no profile
   const needsOnboarding =
-    !loading && (!profile?.business_name || profile.business_name.trim() === '');
+    !loading && (!((profile as any)?.business_name) || ((profile as any)?.business_name ?? '').trim() === '');
 
   const navItems = [
     { id: 'dashboard', icon: 'fa-home', label: 'Início', to: '/app', end: true },
@@ -160,7 +171,7 @@ const AppShell: React.FC = () => {
 
       {profile && (
         <div className="fixed bottom-24 right-6 text-xs text-slate-400">
-          {profile.email}
+          {(profile as any).email}
         </div>
       )}
     </div>

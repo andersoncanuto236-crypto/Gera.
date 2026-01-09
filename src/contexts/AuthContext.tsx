@@ -1,4 +1,11 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabaseClient';
 
@@ -24,7 +31,13 @@ type AuthContextValue = {
   profile: Profile | null;
   userPlan: UserPlan;
   userRole: UserRole;
+
+  // Atualiza apenas o state local (não grava no banco)
   updateProfile: (updates: Partial<Profile>) => void;
+
+  // Re-busca o profile do Supabase e atualiza o state local
+  refreshProfile: (userId?: string) => Promise<Profile | null>;
+
   signInWithPassword: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, emailRedirectTo?: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -67,9 +80,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [userPlan, setUserPlan] = useState<UserPlan>('FREE');
   const [userRole, setUserRole] = useState<UserRole>('USER');
+
   const updateProfile = useCallback((updates: Partial<Profile>) => {
     setProfile((current) => (current ? { ...current, ...updates } : current));
   }, []);
+
+  const refreshProfile = useCallback(
+    async (userId?: string) => {
+      const targetId = userId ?? user?.id;
+
+      if (!targetId) {
+        setProfile(null);
+        setUserPlan('FREE');
+        setUserRole('USER');
+        return null;
+      }
+
+      const p = await fetchProfile(targetId);
+      setProfile(p);
+      setUserPlan(p?.plan ?? 'FREE');
+      setUserRole(p?.role ?? 'USER');
+      return p;
+    },
+    [user]
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -85,12 +119,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(s?.user ?? null);
 
       if (s?.user) {
-        const p = await fetchProfile(s.user.id);
+        await refreshProfile(s.user.id);
         if (!mounted) return;
-
-        setProfile(p);
-        setUserPlan(p?.plan ?? 'FREE');
-        setUserRole(p?.role ?? 'USER');
       } else {
         setProfile(null);
         setUserPlan('FREE');
@@ -109,12 +139,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(newSession?.user ?? null);
 
       if (newSession?.user) {
-        const p = await fetchProfile(newSession.user.id);
+        await refreshProfile(newSession.user.id);
         if (!mounted) return;
-
-        setProfile(p);
-        setUserPlan(p?.plan ?? 'FREE');
-        setUserRole(p?.role ?? 'USER');
       } else {
         setProfile(null);
         setUserPlan('FREE');
@@ -126,7 +152,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       mounted = false;
       sub.subscription.unsubscribe();
     };
-  }, []);
+  }, [refreshProfile]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -137,6 +163,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       userPlan,
       userRole,
       updateProfile,
+      refreshProfile,
       signInWithPassword: async (email, password) => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -154,7 +181,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (error) throw error;
       },
     }),
-    [user, session, loading, profile, userPlan, userRole, updateProfile]
+    [user, session, loading, profile, userPlan, userRole, updateProfile, refreshProfile]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
