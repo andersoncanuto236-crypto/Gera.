@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabaseClient';
 
@@ -9,6 +9,10 @@ type Profile = {
   id: string;
   email: string | null;
   name: string | null;
+  business_name: string | null;
+  niche: string | null;
+  audience: string | null;
+  tone: string | null;
   plan: UserPlan;
   role: UserRole;
 };
@@ -20,6 +24,7 @@ type AuthContextValue = {
   profile: Profile | null;
   userPlan: UserPlan;
   userRole: UserRole;
+  updateProfile: (updates: Partial<Profile>) => void;
   signInWithPassword: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, emailRedirectTo?: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -30,7 +35,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 async function fetchProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id,email,name,plan,role')
+    .select('id,email,name,plan,role,business_name,niche,audience,tone')
     .eq('id', userId)
     .maybeSingle();
 
@@ -45,6 +50,10 @@ async function fetchProfile(userId: string): Promise<Profile | null> {
     id: data.id,
     email: data.email ?? null,
     name: (data as any).name ?? null,
+    business_name: (data as any).business_name ?? null,
+    niche: (data as any).niche ?? null,
+    audience: (data as any).audience ?? null,
+    tone: (data as any).tone ?? null,
     plan: (data.plan as UserPlan) ?? 'FREE',
     role: (data.role as UserRole) ?? 'USER',
   };
@@ -58,6 +67,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [userPlan, setUserPlan] = useState<UserPlan>('FREE');
   const [userRole, setUserRole] = useState<UserRole>('USER');
+  const updateProfile = useCallback((updates: Partial<Profile>) => {
+    setProfile((current) => (current ? { ...current, ...updates } : current));
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -124,6 +136,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       profile,
       userPlan,
       userRole,
+      updateProfile,
       signInWithPassword: async (email, password) => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -141,7 +154,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (error) throw error;
       },
     }),
-    [user, session, loading, profile, userPlan, userRole]
+    [user, session, loading, profile, userPlan, userRole, updateProfile]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

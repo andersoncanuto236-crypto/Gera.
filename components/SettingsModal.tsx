@@ -1,25 +1,42 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { UserSettings } from '../types';
 
 interface SettingsModalProps {
   settings: UserSettings;
-  onSave: (s: UserSettings) => void;
+  onSave: (s: UserSettings) => Promise<void>;
   isOpen: boolean;
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ settings, onSave, isOpen }) => {
   const [formData, setFormData] = useState<UserSettings>(settings);
   const [error, setError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setFormData(settings);
+      setError('');
+    }
+  }, [isOpen, settings]);
 
   if (!isOpen) return null;
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.businessName || !formData.niche || !formData.audience || !formData.tone) {
       setError('Todos os 4 campos são obrigatórios para a estratégia funcionar.');
       return;
     }
-    onSave(formData);
+    setIsSaving(true);
+    setError('');
+    try {
+      await onSave(formData);
+    } catch (err) {
+      console.error('Falha ao salvar onboarding:', err);
+      setError('Não foi possível salvar seus dados. Tente novamente.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const inputClasses = "w-full bg-slate-900 border border-white/10 rounded-xl p-4 text-white placeholder-slate-500 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all font-medium text-sm";
@@ -88,9 +105,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ settings, onSave, isOpen 
           <div className="pt-4">
             <button 
               onClick={handleSave} 
+              disabled={isSaving}
               className="w-full py-5 bg-brand-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-brand-500/20 hover:scale-[1.02] active:scale-95 transition-all"
             >
-              Criar Projeto e Começar
+              {isSaving ? 'Salvando...' : 'Criar Projeto e Começar'}
             </button>
           </div>
         </div>
